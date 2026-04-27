@@ -212,7 +212,21 @@ function compactOne(
     // ellipsis reads cleanly after the cut. The suffix is deterministic
     // (depends only on `truncated`, which is fully determined by input).
     const head = part.slice(0, sectionCap).trimEnd()
-    out.push(`${head}\n\n[... ${truncated} chars truncated]`)
+    const compacted = `${head}\n\n[... ${truncated} chars truncated]`
+
+    // The suffix `\n\n[... N chars truncated]` is ~26+ chars, so a section
+    // that's only barely over the cap (e.g. 401 chars with cap=400) would
+    // grow on rewrite — defeating the point. Commit the rewrite only when
+    // it produces a strict size reduction; otherwise leave the section
+    // untouched. Without this guard a body full of just-over-cap sections
+    // could come out *bigger* while `compactResult.compacted` reports false
+    // (because `newChars >= originalChars`), making the Extra Usage gate
+    // more likely to fire instead of less.
+    if (compacted.length >= part.length) {
+      out.push(part)
+      continue
+    }
+    out.push(compacted)
     sectionsTouched += 1
   }
 
