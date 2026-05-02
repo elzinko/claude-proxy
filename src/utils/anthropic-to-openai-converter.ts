@@ -389,12 +389,13 @@ function updateMetrics(
     metricsData.stop_reason = data.delta.stop_reason
   }
 
+  // Anthropic streams cumulative totals, not per-chunk deltas — assign, don't accumulate.
   if (data.usage) {
-    metricsData.input_tokens += data.usage.input_tokens || 0
-    metricsData.output_tokens += data.usage.output_tokens || 0
-    metricsData.cache_creation_input_tokens +=
+    metricsData.input_tokens = data.usage.input_tokens || 0
+    metricsData.output_tokens = data.usage.output_tokens || 0
+    metricsData.cache_creation_input_tokens =
       data.usage.cache_creation_input_tokens || 0
-    metricsData.cache_read_input_tokens +=
+    metricsData.cache_read_input_tokens =
       data.usage.cache_read_input_tokens || 0
   }
 
@@ -402,11 +403,11 @@ function updateMetrics(
     if (data?.message?.model) {
       metricsData.model = data.message.model
     }
-    metricsData.input_tokens += data.message.usage.input_tokens || 0
-    metricsData.output_tokens += data.message.usage.output_tokens || 0
-    metricsData.cache_creation_input_tokens +=
+    metricsData.input_tokens = data.message.usage.input_tokens || 0
+    metricsData.output_tokens = data.message.usage.output_tokens || 0
+    metricsData.cache_creation_input_tokens =
       data.message.usage.cache_creation_input_tokens || 0
-    metricsData.cache_read_input_tokens +=
+    metricsData.cache_read_input_tokens =
       data.message.usage.cache_read_input_tokens || 0
   }
 
