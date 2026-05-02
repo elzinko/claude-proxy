@@ -57,6 +57,54 @@ export interface AnthropicRequestFromResponses {
   thinking?: Record<string, unknown>
 }
 
+// ── Content block type mapping ─────────────────────────────────────────
+// OpenAI Responses API uses different type names for content blocks.
+// Anthropic rejects unknown types, so we translate before forwarding.
+
+function mapContentBlock(block: Record<string, unknown>, role: string): Record<string, unknown> | null {
+  const t = block.type as string | undefined
+  if (!t) return block
+
+  // User / system content blocks
+  if (t === 'input_text') {
+    return { ...block, type: 'text' }
+  }
+  if (t === 'input_image') {
+    const src = block.source ?? block.image_url
+    return { ...block, type: 'image', source: src }
+  }
+  if (t === 'input_file') {
+    return { ...block, type: 'document' }
+  }
+  if (t === 'input_audio') {
+    return null // not supported by Anthropic
+  }
+
+  // Assistant (output) content blocks — present in multi-turn history
+  if (t === 'output_text') {
+    return { ...block, type: 'text' }
+  }
+  if (t === 'refusal') {
+    return { type: 'text', text: block.refusal ?? block.text ?? '' }
+  }
+
+  return block
+}
+
+function mapContentBlocks(
+  content: string | Array<Record<string, unknown>>,
+  role: string,
+): string | Array<Record<string, unknown>> {
+  if (typeof content === 'string') return content
+  if (!Array.isArray(content)) return content
+  const mapped: Array<Record<string, unknown>> = []
+  for (const block of content) {
+    const result = mapContentBlock(block, role)
+    if (result) mapped.push(result)
+  }
+  return mapped
+}
+
 export function responsesRequestToAnthropic(req: ResponsesApiRequest): AnthropicRequestFromResponses {
   const result: AnthropicRequestFromResponses = {
     model: req.model,
@@ -88,11 +136,13 @@ export function responsesRequestToAnthropic(req: ResponsesApiRequest): Anthropic
         if (text) systemMsgs.push(text)
         continue
       }
-      // Forward tool_calls / tool_call_id verbatim — convertMessages()
-      // turns them into Anthropic tool_use / tool_result blocks. Dropping
-      // them here breaks multi-turn tool replay (role:"tool" inputs lose
-      // their tool_use_id linkage).
-      const out: Record<string, unknown> = { role: msg.role, content: msg.content }
+      // Map OpenAI Responses content block types (input_text, output_text, …)
+      // to Anthropic equivalents (text, image, document, …) before forwarding.
+      const mappedContent = typeof msg.content === 'string' || !msg.content
+        ? msg.content
+        : mapContentBlocks(msg.content as Array<Record<string, unknown>>, msg.role)
+
+      const out: Record<string, unknown> = { role: msg.role, content: mappedContent }
       if (msg.tool_calls) out.tool_calls = msg.tool_calls
       if (msg.tool_call_id) out.tool_call_id = msg.tool_call_id
       result.messages.push(out as { role: string; content: unknown })

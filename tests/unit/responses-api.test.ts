@@ -225,6 +225,106 @@ describe('processAnthropicStreamEvent — streaming', () => {
   })
 })
 
+describe('responsesRequestToAnthropic — content block type mapping', () => {
+  it('maps input_text blocks to text', () => {
+    const result = responsesRequestToAnthropic({
+      model: 'claude-sonnet-4-6',
+      input: [
+        { role: 'user', content: [{ type: 'input_text', text: 'hi' }] },
+      ],
+    })
+    const content = (result.messages[0] as any).content
+    expect(content).toEqual([{ type: 'text', text: 'hi' }])
+  })
+
+  it('maps output_text blocks to text on assistant history turns', () => {
+    const result = responsesRequestToAnthropic({
+      model: 'claude-sonnet-4-6',
+      input: [
+        { role: 'user', content: [{ type: 'input_text', text: 'hello' }] },
+        { role: 'assistant', content: [{ type: 'output_text', text: 'hi there' }] },
+        { role: 'user', content: [{ type: 'input_text', text: 'thanks' }] },
+      ],
+    })
+    const assistantContent = (result.messages[1] as any).content
+    expect(assistantContent).toEqual([{ type: 'text', text: 'hi there' }])
+  })
+
+  it('maps input_image blocks to image', () => {
+    const result = responsesRequestToAnthropic({
+      model: 'claude-sonnet-4-6',
+      input: [
+        { role: 'user', content: [
+          { type: 'input_image', image_url: { url: 'https://example.com/img.png' } },
+        ] },
+      ],
+    })
+    const block = (result.messages[0] as any).content[0]
+    expect(block.type).toBe('image')
+    expect(block.source).toEqual({ url: 'https://example.com/img.png' })
+  })
+
+  it('maps input_file blocks to document', () => {
+    const result = responsesRequestToAnthropic({
+      model: 'claude-sonnet-4-6',
+      input: [
+        { role: 'user', content: [
+          { type: 'input_file', file: { id: 'file_1' } },
+        ] },
+      ],
+    })
+    const block = (result.messages[0] as any).content[0]
+    expect(block.type).toBe('document')
+  })
+
+  it('strips input_audio blocks (unsupported)', () => {
+    const result = responsesRequestToAnthropic({
+      model: 'claude-sonnet-4-6',
+      input: [
+        { role: 'user', content: [
+          { type: 'input_audio', audio: { data: 'base64...' } },
+          { type: 'input_text', text: 'describe audio' },
+        ] },
+      ],
+    })
+    const content = (result.messages[0] as any).content
+    expect(content).toHaveLength(1)
+    expect(content[0].type).toBe('text')
+  })
+
+  it('maps refusal blocks to text', () => {
+    const result = responsesRequestToAnthropic({
+      model: 'claude-sonnet-4-6',
+      input: [
+        { role: 'user', content: 'do something bad' },
+        { role: 'assistant', content: [{ type: 'refusal', refusal: 'I cannot do that.' }] },
+        { role: 'user', content: 'ok nevermind' },
+      ],
+    })
+    const assistantContent = (result.messages[1] as any).content
+    expect(assistantContent).toEqual([{ type: 'text', text: 'I cannot do that.' }])
+  })
+
+  it('preserves string content untouched (regression)', () => {
+    const result = responsesRequestToAnthropic({
+      model: 'claude-sonnet-4-6',
+      input: [{ role: 'user', content: 'just a string' }],
+    })
+    expect((result.messages[0] as any).content).toBe('just a string')
+  })
+
+  it('preserves native Anthropic block types (text, image) untouched', () => {
+    const result = responsesRequestToAnthropic({
+      model: 'claude-sonnet-4-6',
+      input: [
+        { role: 'user', content: [{ type: 'text', text: 'already correct' }] },
+      ],
+    })
+    const content = (result.messages[0] as any).content
+    expect(content).toEqual([{ type: 'text', text: 'already correct' }])
+  })
+})
+
 describe('responsesRequestToAnthropic — tool replay', () => {
   it('preserves tool_calls on assistant turns', () => {
     const result = responsesRequestToAnthropic({
