@@ -88,7 +88,14 @@ export function responsesRequestToAnthropic(req: ResponsesApiRequest): Anthropic
         if (text) systemMsgs.push(text)
         continue
       }
-      result.messages.push({ role: msg.role, content: msg.content })
+      // Forward tool_calls / tool_call_id verbatim — convertMessages()
+      // turns them into Anthropic tool_use / tool_result blocks. Dropping
+      // them here breaks multi-turn tool replay (role:"tool" inputs lose
+      // their tool_use_id linkage).
+      const out: Record<string, unknown> = { role: msg.role, content: msg.content }
+      if (msg.tool_calls) out.tool_calls = msg.tool_calls
+      if (msg.tool_call_id) out.tool_call_id = msg.tool_call_id
+      result.messages.push(out as { role: string; content: unknown })
     }
     if (systemMsgs.length > 0) {
       if (!result.system) result.system = []
@@ -192,6 +199,15 @@ export function anthropicToResponsesResponse(
 
 // ── Streaming response conversion ───────────────────────────────────────
 
+interface CompletedFunctionCall {
+  type: 'function_call'
+  id: string
+  call_id: string
+  name: string
+  status: 'completed'
+  arguments: string
+}
+
 export interface ResponsesStreamState {
   responseId: string
   model: string
@@ -205,6 +221,11 @@ export interface ResponsesStreamState {
   toolCallId: string
   toolCallArgs: string
   toolCallIndex: number
+  // Completed function_call items, kept in emission order so we can
+  // reproduce them inside the terminal `response.completed` payload
+  // (clients that read only the final object would otherwise see no
+  // tool calls in `response.output`).
+  completedFunctionCalls: CompletedFunctionCall[]
 }
 
 export function createResponsesStreamState(): ResponsesStreamState {
@@ -221,6 +242,7 @@ export function createResponsesStreamState(): ResponsesStreamState {
     toolCallId: '',
     toolCallArgs: '',
     toolCallIndex: 0,
+    completedFunctionCalls: [],
   }
 }
 
@@ -364,6 +386,15 @@ export function processAnthropicStreamEvent(
   } else if (type === 'content_block_stop') {
     if (state.inToolCall) {
       state.inToolCall = false
+      const completedCall: CompletedFunctionCall = {
+        type: 'function_call',
+        id: state.toolCallId,
+        call_id: state.toolCallId,
+        name: state.toolCallName,
+        status: 'completed',
+        arguments: state.toolCallArgs,
+      }
+      state.completedFunctionCalls.push(completedCall)
       results.push({
         event: 'response.function_call_arguments.done',
         data: {
@@ -379,14 +410,7 @@ export function processAnthropicStreamEvent(
         data: {
           type: 'response.output_item.done',
           output_index: state.toolCallIndex,
-          item: {
-            type: 'function_call',
-            id: state.toolCallId,
-            call_id: state.toolCallId,
-            name: state.toolCallName,
-            status: 'completed',
-            arguments: state.toolCallArgs,
-          },
+          item: completedCall,
           sequence_number: state.sequenceNumber++,
         },
       })
@@ -437,6 +461,20 @@ export function processAnthropicStreamEvent(
       },
     })
 
+    const finalOutput: Array<Record<string, unknown>> = []
+    if (state.outputText.length > 0) {
+      finalOutput.push({
+        type: 'message',
+        id: state.itemId,
+        role: 'assistant',
+        status: 'completed',
+        content: [{ type: 'output_text', text: state.outputText }],
+      })
+    }
+    for (const fc of state.completedFunctionCalls) {
+      finalOutput.push(fc as unknown as Record<string, unknown>)
+    }
+
     results.push({
       event: 'response.completed',
       data: {
@@ -447,15 +485,7 @@ export function processAnthropicStreamEvent(
           created_at: Math.floor(Date.now() / 1000),
           status: 'completed',
           model: state.model,
-          output: [
-            {
-              type: 'message',
-              id: state.itemId,
-              role: 'assistant',
-              status: 'completed',
-              content: [{ type: 'output_text', text: state.outputText }],
-            },
-          ],
+          output: finalOutput,
           output_text: state.outputText,
           usage: {
             input_tokens: state.inputTokens,

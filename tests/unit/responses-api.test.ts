@@ -155,4 +155,91 @@ describe('processAnthropicStreamEvent — streaming', () => {
     })
     expect((events[0].data as any).sequence_number).toBeGreaterThan(0)
   })
+
+  it('response.completed includes function_call items emitted during streaming', () => {
+    const state = createResponsesStreamState()
+    processAnthropicStreamEvent(state, {
+      type: 'message_start',
+      message: { id: 'msg_x', model: 'claude-sonnet-4-6' },
+    })
+    processAnthropicStreamEvent(state, {
+      type: 'content_block_start',
+      content_block: { type: 'tool_use', id: 'toolu_1', name: 'get_weather' },
+    })
+    processAnthropicStreamEvent(state, {
+      type: 'content_block_delta',
+      delta: { partial_json: '{"city":"Paris"}' },
+    })
+    processAnthropicStreamEvent(state, { type: 'content_block_stop' })
+    const events = processAnthropicStreamEvent(state, { type: 'message_stop' })
+
+    const completed = events.find(e => e.event === 'response.completed')
+    const output = (completed!.data.response as any).output as any[]
+    const fcItem = output.find(o => o.type === 'function_call')
+    expect(fcItem).toBeDefined()
+    expect(fcItem.name).toBe('get_weather')
+    expect(fcItem.arguments).toBe('{"city":"Paris"}')
+  })
+
+  it('response.completed omits the message item when no text was streamed', () => {
+    const state = createResponsesStreamState()
+    processAnthropicStreamEvent(state, {
+      type: 'message_start',
+      message: { id: 'msg_x', model: 'claude-sonnet-4-6' },
+    })
+    processAnthropicStreamEvent(state, {
+      type: 'content_block_start',
+      content_block: { type: 'tool_use', id: 'toolu_1', name: 'noop' },
+    })
+    processAnthropicStreamEvent(state, {
+      type: 'content_block_delta',
+      delta: { partial_json: '{}' },
+    })
+    processAnthropicStreamEvent(state, { type: 'content_block_stop' })
+    const events = processAnthropicStreamEvent(state, { type: 'message_stop' })
+
+    const completed = events.find(e => e.event === 'response.completed')
+    const output = (completed!.data.response as any).output as any[]
+    expect(output.every(o => o.type !== 'message')).toBe(true)
+    expect(output.find(o => o.type === 'function_call')).toBeDefined()
+  })
+})
+
+describe('responsesRequestToAnthropic — tool replay', () => {
+  it('preserves tool_calls on assistant turns', () => {
+    const result = responsesRequestToAnthropic({
+      model: 'claude-sonnet-4-6',
+      input: [
+        { role: 'user', content: 'weather?' },
+        {
+          role: 'assistant',
+          content: 'one moment',
+          tool_calls: [
+            { id: 'toolu_1', type: 'function', function: { name: 'get_weather', arguments: '{"city":"Paris"}' } },
+          ],
+        },
+      ],
+    })
+    const assistantMsg = result.messages[1] as any
+    expect(assistantMsg.tool_calls).toBeDefined()
+    expect(assistantMsg.tool_calls[0].id).toBe('toolu_1')
+  })
+
+  it('preserves tool_call_id on role:"tool" turns (so convertMessages can build tool_result)', () => {
+    const result = responsesRequestToAnthropic({
+      model: 'claude-sonnet-4-6',
+      input: [
+        { role: 'user', content: 'q' },
+        {
+          role: 'assistant',
+          content: '',
+          tool_calls: [{ id: 'toolu_1', type: 'function', function: { name: 'f', arguments: '{}' } }],
+        },
+        { role: 'tool', tool_call_id: 'toolu_1', content: 'sunny' },
+      ],
+    })
+    const toolMsg = result.messages[2] as any
+    expect(toolMsg.tool_call_id).toBe('toolu_1')
+    expect(toolMsg.role).toBe('tool')
+  })
 })

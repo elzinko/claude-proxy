@@ -1161,29 +1161,52 @@ const responsesFn = async (c: Context) => {
 
       return stream(c, async (s) => {
         const state = createResponsesStreamState()
+        // SSE frames are delimited by `\n\n`. A single network read can land
+        // in the middle of a frame, so we buffer until we see the delimiter
+        // — splitting per-chunk would silently drop the trailing fragment
+        // and lose deltas / function-call argument bytes.
+        let buffer = ''
+        const drainBuffer = async (flushAll: boolean) => {
+          let cutAt: number
+          while ((cutAt = buffer.indexOf('\n\n')) !== -1) {
+            const frame = buffer.slice(0, cutAt)
+            buffer = buffer.slice(cutAt + 2)
+            await processFrame(frame)
+          }
+          if (flushAll && buffer.length > 0) {
+            await processFrame(buffer)
+            buffer = ''
+          }
+        }
+        const processFrame = async (frame: string) => {
+          for (const line of frame.split('\n')) {
+            const trimmed = line.trim()
+            if (!trimmed || trimmed.startsWith('event:')) continue
+            if (trimmed.startsWith('data: ') && trimmed.includes('{')) {
+              try {
+                const data = JSON.parse(trimmed.replace(/^data: /, ''))
+                if (data.type === 'ping') continue
+                const events = processAnthropicStreamEvent(state, data)
+                for (const evt of events) {
+                  await s.write(`event: ${evt.event}\ndata: ${JSON.stringify(evt.data)}\n\n`)
+                }
+              } catch (parseErr) {
+                console.error('[PROXY] /v1/responses parse error:', parseErr)
+              }
+            }
+          }
+        }
+
         try {
           while (true) {
             const { done, value } = await reader.read()
             if (done) break
-
-            const chunk = decoder.decode(value, { stream: true })
-            const lines = chunk.split('\n')
-
-            for (const line of lines) {
-              const trimmed = line.trim()
-              if (!trimmed || trimmed.startsWith('event:')) continue
-              if (trimmed.startsWith('data: ') && trimmed.includes('{')) {
-                try {
-                  const data = JSON.parse(trimmed.replace(/^data: /, ''))
-                  if (data.type === 'ping') continue
-                  const events = processAnthropicStreamEvent(state, data)
-                  for (const evt of events) {
-                    await s.write(`event: ${evt.event}\ndata: ${JSON.stringify(evt.data)}\n\n`)
-                  }
-                } catch { /* skip parse errors */ }
-              }
-            }
+            buffer += decoder.decode(value, { stream: true })
+            await drainBuffer(false)
           }
+          // Flush any trailing bytes from the final non-streaming decode.
+          buffer += decoder.decode()
+          await drainBuffer(true)
         } catch (error) {
           console.error('[PROXY] /v1/responses stream error:', error)
         } finally {
