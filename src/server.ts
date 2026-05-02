@@ -46,6 +46,13 @@ import { buildAnthropicBetas } from './utils/anthropic-betas'
 import { injectCacheControl } from './utils/cache-control'
 import { compactSystem } from './utils/compact-system'
 import { sanitizeBodyForAnthropic } from './utils/sanitize-body'
+import {
+  responsesRequestToAnthropic,
+  anthropicToResponsesResponse,
+  createResponsesStreamState,
+  processAnthropicStreamEvent,
+} from './utils/responses-api'
+import type { ResponsesApiRequest } from './utils/responses-api'
 import { corsPreflightHandler, corsMiddleware } from './utils/cors-bypass'
 import {
   isCursorKeyCheck,
@@ -1010,6 +1017,226 @@ const messagesFn = async (c: Context) => {
 
 app.post('/v1/chat/completions', messagesFn)
 app.post('/v1/messages', messagesFn)
+
+// ── OpenAI Responses API (/v1/responses) ────────────────────────────────
+// Accepts the OpenAI Responses API format (input/instructions/tools) and
+// proxies to Anthropic Messages API, converting the response back.
+// Reuses the same auth, rate-limiting, model-mapping pipeline.
+const responsesFn = async (c: Context) => {
+  const startTime = Date.now()
+  const reqBody: ResponsesApiRequest = await c.req.json()
+  const isStreaming = reqBody.stream === true
+
+  reqBody.model = mapModelName(reqBody.model)
+
+  console.log(`[PROXY] /v1/responses model=${reqBody.model} stream=${isStreaming}`)
+
+  // Auth
+  const keyResult = validateApiKey(c)
+  if (!keyResult.ok) {
+    if (keyResult.status === 401) console.log('[PROXY] Rejected: invalid API key')
+    return c.json(keyResult.body, keyResult.status)
+  }
+  const apiKey = keyResult.key
+  const project = extractProjectFromApiKey(apiKey)
+
+  // Client fingerprint + revocation
+  const clientIp = getClientIp(c)
+  const clientUa = c.req.header('user-agent') || ''
+  const clientCountry = getCountry(c)
+  const clientFp = computeFingerprint(apiKey, clientIp)
+  if (await tracker.isRevoked(clientFp)) {
+    console.log(`[PROXY] Rejected: client ${clientFp} is revoked (ip=${clientIp})`)
+    await tracker.trackRequest({
+      fingerprint: clientFp, apiKey, ip: clientIp, ua: clientUa,
+      country: clientCountry, tokensIn: 0, tokensOut: 0, blocked: true,
+    })
+    return c.json({ error: 'Client revoked', message: 'This client has been revoked.' }, 403)
+  }
+
+  // Rate limiting
+  const rateCheck = rateLimiter.check(project)
+  if (!rateCheck.allowed) {
+    const resetIn = Math.ceil((rateCheck.resetAt - Date.now()) / 1000 / 60)
+    return c.json({ error: 'Rate limit exceeded', message: `Try again in ${resetIn} minutes.` }, 429)
+  }
+
+  // Convert Responses API → Anthropic Messages API
+  const anthropicBody = responsesRequestToAnthropic(reqBody) as unknown as Record<string, unknown>
+
+  // Inject the Claude Code marker for non-Claude-Code origins
+  if (!anthropicBody.system) anthropicBody.system = []
+  ;(anthropicBody.system as Array<{ type: string; text: string }>).unshift({
+    type: 'text',
+    text: "You are Claude Code, Anthropic's official CLI for Claude.",
+  })
+
+  if (!anthropicBody.max_tokens) {
+    const model = (anthropicBody.model as string).toLowerCase()
+    anthropicBody.max_tokens = model.includes('haiku') ? 8_192 : 16_000
+  }
+
+  // Convert messages (handle tool format, cache_control, etc.)
+  if (anthropicBody.messages) {
+    anthropicBody.messages = convertMessages(anthropicBody.messages as any) as any
+  }
+
+  const oauthToken = await getAccessToken()
+  if (!oauthToken) {
+    return c.json<ErrorResponse>({
+      error: 'Authentication required',
+      message: 'Please authenticate using OAuth first.',
+    }, 401)
+  }
+
+  if (anthropicBody.thinking) {
+    delete anthropicBody.temperature
+    delete anthropicBody.top_p
+    delete anthropicBody.top_k
+  }
+
+  const anthropicBetas = buildAnthropicBetas({
+    thinking: Boolean(anthropicBody.thinking),
+    model: anthropicBody.model as string,
+    enable1M: process.env.ENABLE_1M_CONTEXT === 'true',
+  })
+
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+    authorization: `Bearer ${oauthToken}`,
+    'anthropic-beta': anthropicBetas.join(','),
+    'anthropic-version': '2023-06-01',
+    'user-agent': '@anthropic-ai/sdk 1.2.12 node/22.13.1',
+    accept: isStreaming ? 'text/event-stream' : 'application/json',
+    'accept-encoding': 'gzip, deflate',
+  }
+
+  if (!anthropicBody.metadata) anthropicBody.metadata = {}
+
+  const cacheResult = injectCacheControl(anthropicBody, {
+    disabled: process.env.DISABLE_CACHE_CONTROL === '1',
+    ttl1h: process.env.CACHE_TTL_1H === '1',
+  })
+
+  const cleanBody = sanitizeBodyForAnthropic(anthropicBody)
+
+  console.log(
+    `[PROXY] /v1/responses -> Anthropic: model=${cleanBody.model} max_tokens=${cleanBody.max_tokens} ` +
+      `cache=${cacheResult.injected ? `${cacheResult.addedBreakpoints}bp` : 'off'}`,
+  )
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(cleanBody),
+      signal: c.req.raw.signal,
+    })
+
+    if (!response.ok) {
+      const error = await response.text()
+      console.error('[PROXY] /v1/responses API Error:', error)
+      await tracker.trackRequest({
+        fingerprint: clientFp, apiKey, ip: clientIp, ua: clientUa,
+        country: clientCountry, tokensIn: 0, tokensOut: 0, blocked: false,
+      })
+      return new Response(error, {
+        status: response.status,
+        headers: { 'Content-Type': 'text/plain' },
+      })
+    }
+
+    if (isStreaming) {
+      await tracker.trackRequest({
+        fingerprint: clientFp, apiKey, ip: clientIp, ua: clientUa,
+        country: clientCountry, tokensIn: 0, tokensOut: 0, blocked: false,
+      })
+
+      c.header('Content-Type', 'text/event-stream')
+      c.header('Cache-Control', 'no-cache')
+      c.header('Connection', 'keep-alive')
+
+      const reader = response.body!.getReader()
+      const decoder = new TextDecoder()
+
+      return stream(c, async (s) => {
+        const state = createResponsesStreamState()
+        // SSE frames are delimited by `\n\n`. A single network read can land
+        // in the middle of a frame, so we buffer until we see the delimiter
+        // — splitting per-chunk would silently drop the trailing fragment
+        // and lose deltas / function-call argument bytes.
+        let buffer = ''
+        const drainBuffer = async (flushAll: boolean) => {
+          let cutAt: number
+          while ((cutAt = buffer.indexOf('\n\n')) !== -1) {
+            const frame = buffer.slice(0, cutAt)
+            buffer = buffer.slice(cutAt + 2)
+            await processFrame(frame)
+          }
+          if (flushAll && buffer.length > 0) {
+            await processFrame(buffer)
+            buffer = ''
+          }
+        }
+        const processFrame = async (frame: string) => {
+          for (const line of frame.split('\n')) {
+            const trimmed = line.trim()
+            if (!trimmed || trimmed.startsWith('event:')) continue
+            if (trimmed.startsWith('data: ') && trimmed.includes('{')) {
+              try {
+                const data = JSON.parse(trimmed.replace(/^data: /, ''))
+                if (data.type === 'ping') continue
+                const events = processAnthropicStreamEvent(state, data)
+                for (const evt of events) {
+                  await s.write(`event: ${evt.event}\ndata: ${JSON.stringify(evt.data)}\n\n`)
+                }
+              } catch (parseErr) {
+                console.error('[PROXY] /v1/responses parse error:', parseErr)
+              }
+            }
+          }
+        }
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            buffer += decoder.decode(value, { stream: true })
+            await drainBuffer(false)
+          }
+          // Flush any trailing bytes from the final non-streaming decode.
+          buffer += decoder.decode()
+          await drainBuffer(true)
+        } catch (error) {
+          console.error('[PROXY] /v1/responses stream error:', error)
+        } finally {
+          reader.releaseLock()
+        }
+      })
+    } else {
+      const responseData = (await response.json()) as AnthropicResponse
+
+      logRequest(c, apiKey, reqBody.model, startTime, responseData, response.status)
+      await tracker.trackRequest({
+        fingerprint: clientFp, apiKey, ip: clientIp, ua: clientUa,
+        country: clientCountry,
+        tokensIn: responseData.usage?.input_tokens || 0,
+        tokensOut: responseData.usage?.output_tokens || 0,
+        blocked: false,
+      })
+
+      return c.json(anthropicToResponsesResponse(responseData))
+    }
+  } catch (error) {
+    console.error('[PROXY] /v1/responses error:', error)
+    return c.json<ErrorResponse>(
+      { error: 'Proxy error', details: (error as Error).message },
+      500,
+    )
+  }
+}
+
+app.post('/v1/responses', responsesFn)
 
 const port = Number(process.env.PORT || 9095)
 

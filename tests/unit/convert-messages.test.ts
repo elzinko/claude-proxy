@@ -79,3 +79,88 @@ describe('convertMessages', () => {
     expect(blocks[1].input).toEqual({ k: 2 })
   })
 })
+
+describe('convertMessages — message-level cache_control relocation', () => {
+  it('string content: wraps into a text block with cache_control', () => {
+    const out = convertMessages([
+      { role: 'user', content: 'hi', cache_control: { type: 'ephemeral' } } as any,
+    ])
+    expect(out).toEqual([{
+      role: 'user',
+      content: [{ type: 'text', text: 'hi', cache_control: { type: 'ephemeral' } }],
+    }])
+  })
+
+  it('array content: adds cache_control on the last block', () => {
+    const out = convertMessages([
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'a' },
+          { type: 'text', text: 'b' },
+        ],
+        cache_control: { type: 'ephemeral' },
+      } as any,
+    ])
+    const blocks = out[0].content as Array<Record<string, unknown>>
+    expect(blocks[0].cache_control).toBeUndefined()
+    expect(blocks[1].cache_control).toEqual({ type: 'ephemeral' })
+  })
+
+  it('cacheControl (camelCase) is treated like cache_control', () => {
+    const out = convertMessages([
+      { role: 'user', content: 'hi', cacheControl: { type: 'ephemeral' } } as any,
+    ])
+    expect(out).toEqual([{
+      role: 'user',
+      content: [{ type: 'text', text: 'hi', cache_control: { type: 'ephemeral' } }],
+    }])
+  })
+
+  it('assistant with tool_calls: cache_control placed on last tool_use block', () => {
+    const out = convertMessages([
+      {
+        role: 'assistant',
+        content: 'thinking...',
+        tool_calls: [
+          { id: 'a', type: 'function', function: { name: 'exec', arguments: '{}' } },
+        ],
+        cache_control: { type: 'ephemeral' },
+      } as any,
+    ])
+    const blocks = out[0].content as Array<Record<string, unknown>>
+    expect(blocks[0].cache_control).toBeUndefined()
+    expect(blocks[1].cache_control).toEqual({ type: 'ephemeral' })
+  })
+
+  it('tool message: cache_control placed on the tool_result block', () => {
+    const out = convertMessages([
+      { role: 'tool', tool_call_id: 'tc_1', content: 'ok', cache_control: { type: 'ephemeral' } } as any,
+    ])
+    const blocks = out[0].content as Array<Record<string, unknown>>
+    expect(blocks[0]).toEqual({
+      type: 'tool_result',
+      tool_use_id: 'tc_1',
+      content: 'ok',
+      cache_control: { type: 'ephemeral' },
+    })
+  })
+
+  it('does not leave cache_control / cacheControl at message level', () => {
+    const out = convertMessages([
+      { role: 'user', content: 'hi', cache_control: { type: 'ephemeral' } } as any,
+      { role: 'assistant', content: 'hello', cacheControl: { type: 'ephemeral' } } as any,
+    ])
+    for (const msg of out) {
+      expect((msg as any).cache_control).toBeUndefined()
+      expect((msg as any).cacheControl).toBeUndefined()
+    }
+  })
+
+  it('messages without cache_control pass through unchanged', () => {
+    const out = convertMessages([
+      { role: 'user', content: 'hi' },
+    ])
+    expect(out).toEqual([{ role: 'user', content: 'hi' }])
+  })
+})

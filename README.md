@@ -91,6 +91,8 @@ Replaying the same curl 200 ms later should flip `cache_creation` to 0 and `cach
 
 **Streaming** — cache metrics arrive in the final `usage` chunk of the stream (same OpenAI-compat `prompt_tokens_details` shape). The response-header mirror is not populated for streaming responses because headers are flushed before usage numbers arrive from Anthropic.
 
+**End-to-end probes against real openclaw payloads** — the in-repo tests use synthetic ~5 KB fillers (Haiku-friendly, deterministic, safe to commit). For E2E validation against **real openclaw traffic** (22 KB system prompt, 23 KB tools, multi-turn `tool_use`/`tool_result` histories — patterns that can introduce silent cache invalidators a synthetic payload can't reproduce), use the companion repo: **[claude-proxy-probe](https://github.com/elzinko/claude-proxy-probe)**. It ships five bash strategies (`01-auth-smoke` → `05-silent-invalidator-diff`) and is designed to run against a deployed preview/prod with fixtures kept out of version control.
+
 ---
 
 ## Docs
