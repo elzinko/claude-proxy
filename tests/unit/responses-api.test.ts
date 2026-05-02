@@ -181,6 +181,26 @@ describe('processAnthropicStreamEvent — streaming', () => {
     expect(fcItem.arguments).toBe('{"city":"Paris"}')
   })
 
+  it('output_tokens reflects the latest cumulative value, not the sum of message_delta events', () => {
+    // Anthropic streams cumulative usage in message_delta. A long response
+    // yields multiple delta events: 10, 25, 50. The terminal usage must
+    // be 50, not 10+25+50=85.
+    const state = createResponsesStreamState()
+    processAnthropicStreamEvent(state, {
+      type: 'message_start',
+      message: { id: 'msg_z', model: 'claude-sonnet-4-6', usage: { input_tokens: 100, output_tokens: 1 } },
+    })
+    processAnthropicStreamEvent(state, { type: 'message_delta', usage: { output_tokens: 10 } })
+    processAnthropicStreamEvent(state, { type: 'message_delta', usage: { output_tokens: 25 } })
+    processAnthropicStreamEvent(state, { type: 'message_delta', usage: { output_tokens: 50 } })
+    const events = processAnthropicStreamEvent(state, { type: 'message_stop' })
+
+    const completed = events.find(e => e.event === 'response.completed')
+    const usage = (completed!.data.response as any).usage
+    expect(usage.output_tokens).toBe(50)
+    expect(usage.input_tokens).toBe(100)
+  })
+
   it('response.completed omits the message item when no text was streamed', () => {
     const state = createResponsesStreamState()
     processAnthropicStreamEvent(state, {

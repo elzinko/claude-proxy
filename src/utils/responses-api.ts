@@ -264,10 +264,15 @@ export function processAnthropicStreamEvent(
       state.responseId = `resp_${(msg.id as string || '').replace('msg_', '') || Date.now()}`
       state.itemId = `msg_${(msg.id as string || '').replace('msg_', '') || Date.now()}`
       state.model = (msg.model as string) || state.model
+      // Anthropic emits a single `message_start` per response carrying
+      // the full input_tokens count and a starting output_tokens value
+      // (typically 1). Both are absolute, not deltas — assign rather
+      // than accumulate. Subsequent `message_delta` events overwrite
+      // outputTokens with the running cumulative total.
       const usage = msg.usage as Record<string, number> | undefined
       if (usage) {
-        state.inputTokens += usage.input_tokens || 0
-        state.outputTokens += usage.output_tokens || 0
+        state.inputTokens = usage.input_tokens || 0
+        state.outputTokens = usage.output_tokens || 0
       }
     }
 
@@ -416,9 +421,14 @@ export function processAnthropicStreamEvent(
       })
     }
   } else if (type === 'message_delta') {
+    // Anthropic streams `message_delta.usage.output_tokens` as a
+    // CUMULATIVE running total for the whole response, not as a per-
+    // chunk delta. Multiple `message_delta` events arrive on long
+    // responses; accumulating them inflates the count linearly. Take
+    // the latest value as the truth.
     const usage = eventData.usage as Record<string, number> | undefined
-    if (usage) {
-      state.outputTokens += usage.output_tokens || 0
+    if (usage && typeof usage.output_tokens === 'number') {
+      state.outputTokens = usage.output_tokens
     }
   } else if (type === 'message_stop') {
     results.push({
