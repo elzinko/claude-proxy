@@ -57,6 +57,117 @@ export interface AnthropicRequestFromResponses {
   thinking?: Record<string, unknown>
 }
 
+// ── Content block type mapping ─────────────────────────────────────────
+// OpenAI Responses API uses different type names for content blocks.
+// Anthropic rejects unknown types AND unknown source shapes, so we
+// translate the type *and* rebuild the source payload before forwarding.
+
+const DATA_URL_RE = /^data:([^;,]+);base64,(.+)$/
+
+// Anthropic image/document `source` is a tagged union:
+//   {type: 'url',    url: '...'}                            (https URLs)
+//   {type: 'base64', media_type: '...', data: '...'}        (data: URLs)
+// OpenAI sends `image_url` as a string (URL or data URL) or the
+// Chat-Completions-style `{url: "..."}` wrapper. Coerce both into a
+// valid Anthropic source; return null for unrecognized payloads so the
+// block can be stripped instead of forwarded as a 400.
+function buildAnthropicSource(input: unknown): Record<string, unknown> | null {
+  let url: string | undefined
+  if (typeof input === 'string') url = input
+  else if (input && typeof input === 'object') {
+    const obj = input as Record<string, unknown>
+    if (typeof obj.url === 'string') url = obj.url
+    // Pre-normalized Anthropic source — pass through as-is.
+    if (typeof obj.type === 'string' && (obj.type === 'url' || obj.type === 'base64')) {
+      return obj
+    }
+  }
+  if (!url) return null
+
+  const m = DATA_URL_RE.exec(url)
+  if (m) return { type: 'base64', media_type: m[1], data: m[2] }
+  return { type: 'url', url }
+}
+
+// `input_file` carries one of: data URL in `file_data`, public URL in
+// `file_url`, or an OpenAI-only `file_id` (which we cannot resolve from
+// the proxy and Anthropic will not accept). Build a proper document
+// source from the first two; return null for the third.
+function buildDocumentSource(block: Record<string, unknown>): Record<string, unknown> | null {
+  const fileData = block.file_data
+  if (typeof fileData === 'string') {
+    const m = DATA_URL_RE.exec(fileData)
+    if (m) return { type: 'base64', media_type: m[1], data: m[2] }
+  }
+  const fileUrl = block.file_url
+  if (typeof fileUrl === 'string') return { type: 'url', url: fileUrl }
+  if (block.source && typeof block.source === 'object') return block.source as Record<string, unknown>
+  return null
+}
+
+function mapContentBlock(block: Record<string, unknown>, role: string): Record<string, unknown> | null {
+  const t = block.type as string | undefined
+  if (!t) return block
+
+  // User / system content blocks
+  if (t === 'input_text') {
+    // Strip OpenAI-only fields by extracting only what Anthropic accepts.
+    const out: Record<string, unknown> = { type: 'text', text: block.text ?? '' }
+    if (block.cache_control) out.cache_control = block.cache_control
+    return out
+  }
+  if (t === 'input_image') {
+    const source = buildAnthropicSource(block.image_url ?? block.source)
+    if (!source) {
+      console.warn('[responses-api] dropping input_image with unrecognized source shape')
+      return null
+    }
+    const out: Record<string, unknown> = { type: 'image', source }
+    if (block.cache_control) out.cache_control = block.cache_control
+    return out
+  }
+  if (t === 'input_file') {
+    const source = buildDocumentSource(block)
+    if (!source) {
+      console.warn('[responses-api] dropping input_file: cannot resolve file_id without file_data or file_url')
+      return null
+    }
+    const out: Record<string, unknown> = { type: 'document', source }
+    if (block.cache_control) out.cache_control = block.cache_control
+    return out
+  }
+  if (t === 'input_audio') {
+    console.warn('[responses-api] dropping input_audio: not supported by Anthropic')
+    return null
+  }
+
+  // Assistant (output) content blocks — present in multi-turn history
+  if (t === 'output_text') {
+    const out: Record<string, unknown> = { type: 'text', text: block.text ?? '' }
+    if (block.cache_control) out.cache_control = block.cache_control
+    return out
+  }
+  if (t === 'refusal') {
+    return { type: 'text', text: block.refusal ?? block.text ?? '' }
+  }
+
+  return block
+}
+
+function mapContentBlocks(
+  content: string | Array<Record<string, unknown>>,
+  role: string,
+): string | Array<Record<string, unknown>> {
+  if (typeof content === 'string') return content
+  if (!Array.isArray(content)) return content
+  const mapped: Array<Record<string, unknown>> = []
+  for (const block of content) {
+    const result = mapContentBlock(block, role)
+    if (result) mapped.push(result)
+  }
+  return mapped
+}
+
 export function responsesRequestToAnthropic(req: ResponsesApiRequest): AnthropicRequestFromResponses {
   const result: AnthropicRequestFromResponses = {
     model: req.model,
@@ -88,11 +199,13 @@ export function responsesRequestToAnthropic(req: ResponsesApiRequest): Anthropic
         if (text) systemMsgs.push(text)
         continue
       }
-      // Forward tool_calls / tool_call_id verbatim — convertMessages()
-      // turns them into Anthropic tool_use / tool_result blocks. Dropping
-      // them here breaks multi-turn tool replay (role:"tool" inputs lose
-      // their tool_use_id linkage).
-      const out: Record<string, unknown> = { role: msg.role, content: msg.content }
+      // Map OpenAI Responses content block types (input_text, output_text, …)
+      // to Anthropic equivalents (text, image, document, …) before forwarding.
+      const mappedContent = typeof msg.content === 'string' || !msg.content
+        ? msg.content
+        : mapContentBlocks(msg.content as Array<Record<string, unknown>>, msg.role)
+
+      const out: Record<string, unknown> = { role: msg.role, content: mappedContent }
       if (msg.tool_calls) out.tool_calls = msg.tool_calls
       if (msg.tool_call_id) out.tool_call_id = msg.tool_call_id
       result.messages.push(out as { role: string; content: unknown })
