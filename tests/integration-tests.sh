@@ -213,7 +213,9 @@ fi
 # ─────────────────────────────────────────────────────────────────────
 
 pr3_tmp=$(mktemp)
-trap 'rm -f "${models_tmp}" "${chat_tmp}" "${pr3_tmp}"' EXIT
+responses_tmp=$(mktemp)
+responses_stream_tmp=$(mktemp)
+trap 'rm -f "${models_tmp}" "${chat_tmp}" "${pr3_tmp}" "${responses_tmp}" "${responses_stream_tmp}"' EXIT
 
 if [[ "${NO_OAUTH_MODE}" != "1" && "${SMOKE_ONLY}" != "1" ]]; then
   echo "== 3) developer → system role normalization (PR #3) =="
@@ -314,5 +316,159 @@ else
   echo ">>> Si 404 → route /api/clients pas montée (preview pas à jour ou ce n'est pas le bon build)."
 fi
 echo ""
+
+# ─────────────────────────────────────────────────────────────────────
+# Tests POST /v1/responses (PR #11) — OpenAI Responses API surface.
+# Trois cas : input string, input message-array + instructions, streaming
+# (SSE events response.created → ... → response.completed).
+# Skip en SMOKE_ONLY (appels Claude). En NO_OAUTH_MODE, on attend 401 OAuth
+# pour valider le pipeline d'auth + routage sans brûler de quota.
+# ─────────────────────────────────────────────────────────────────────
+
+if [[ "${SMOKE_ONLY}" == "1" ]]; then
+  echo "== 6) POST /v1/responses — SKIPPED (SMOKE_ONLY) =="
+  echo ""
+else
+  echo "== 6.a) POST /v1/responses (input: string, non-stream) =="
+  resp_a_http=$(curl -sS ${BYPASS_ARGS[@]+"${BYPASS_ARGS[@]}"} -o "${responses_tmp}" -w "%{http_code}" \
+    -H "Authorization: Bearer ${API_KEY}" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "model": "claude-proxy-haiku-4.5",
+      "input": "Reply with exactly: OK_RESPONSES_A",
+      "max_output_tokens": 64
+    }' \
+    "${BASE_URL}/responses")
+
+  if [[ "${NO_OAUTH_MODE}" == "1" ]]; then
+    if [[ "${resp_a_http}" == "401" ]] && grep -q 'OAuth' "${responses_tmp}" 2>/dev/null; then
+      echo "OK (401 OAuth attendu — API_KEY validée, route /v1/responses montée)"
+    else
+      echo "FAIL HTTP ${resp_a_http} — attendu 401 OAuth en mode no-OAuth"
+      cat "${responses_tmp}" || true
+      exit 1
+    fi
+  elif [[ "${resp_a_http}" != "200" ]]; then
+    echo "FAIL HTTP ${resp_a_http}"
+    cat "${responses_tmp}" || true
+    exit 1
+  elif command -v jq >/dev/null 2>&1; then
+    obj=$(jq -r '.object // empty' "${responses_tmp}")
+    status=$(jq -r '.status // empty' "${responses_tmp}")
+    text=$(jq -r '.output_text // empty' "${responses_tmp}")
+    if [[ "${obj}" != "response" ]] || [[ "${status}" != "completed" ]] || [[ -z "${text}" ]]; then
+      echo "FAIL — réponse mal formée (object=${obj}, status=${status}, output_text vide=$([[ -z ${text} ]] && echo true || echo false))"
+      cat "${responses_tmp}"
+      exit 1
+    fi
+    echo "OK (200) — object=response, status=completed"
+    echo "Extrait output_text :"
+    echo "${text}" | head -c 300
+    echo ""
+  else
+    grep -q '"object"[[:space:]]*:[[:space:]]*"response"' "${responses_tmp}" || {
+      echo "FAIL — pas de \"object\":\"response\""; cat "${responses_tmp}"; exit 1
+    }
+    grep -q '"output_text"' "${responses_tmp}" || {
+      echo "FAIL — pas de output_text"; cat "${responses_tmp}"; exit 1
+    }
+    echo "OK (200) — réponse contient object=response et output_text (installe jq pour plus de détails)"
+  fi
+  echo ""
+
+  echo "== 6.b) POST /v1/responses (input: message[], instructions) =="
+  resp_b_http=$(curl -sS ${BYPASS_ARGS[@]+"${BYPASS_ARGS[@]}"} -o "${responses_tmp}" -w "%{http_code}" \
+    -H "Authorization: Bearer ${API_KEY}" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "model": "claude-proxy-haiku-4.5",
+      "instructions": "You are a test probe. Reply with the literal token requested.",
+      "input": [
+        {"role": "user", "content": "Reply with exactly: OK_RESPONSES_B"}
+      ],
+      "max_output_tokens": 64
+    }' \
+    "${BASE_URL}/responses")
+
+  if [[ "${NO_OAUTH_MODE}" == "1" ]]; then
+    if [[ "${resp_b_http}" == "401" ]] && grep -q 'OAuth' "${responses_tmp}" 2>/dev/null; then
+      echo "OK (401 OAuth attendu)"
+    else
+      echo "FAIL HTTP ${resp_b_http}"
+      cat "${responses_tmp}" || true
+      exit 1
+    fi
+  elif [[ "${resp_b_http}" != "200" ]]; then
+    echo "FAIL HTTP ${resp_b_http}"
+    cat "${responses_tmp}" || true
+    exit 1
+  elif command -v jq >/dev/null 2>&1; then
+    text=$(jq -r '.output_text // empty' "${responses_tmp}")
+    msg_count=$(jq -r '[.output[]? | select(.type == "message")] | length' "${responses_tmp}")
+    if [[ -z "${text}" ]] || [[ "${msg_count}" == "0" ]]; then
+      echo "FAIL — pas de message dans output (msg_count=${msg_count}, text vide=$([[ -z ${text} ]] && echo true || echo false))"
+      cat "${responses_tmp}"
+      exit 1
+    fi
+    echo "OK (200) — instructions consommées, message produit"
+    echo "Extrait output_text :"
+    echo "${text}" | head -c 300
+    echo ""
+  else
+    grep -q '"output_text"' "${responses_tmp}" || {
+      echo "FAIL — pas de output_text"; cat "${responses_tmp}"; exit 1
+    }
+    echo "OK (200) — output_text présent"
+  fi
+  echo ""
+
+  echo "== 6.c) POST /v1/responses (stream: true → SSE) =="
+  # Plafonne la durée pour éviter de bloquer la CI si le stream ne se ferme
+  # pas — 30 s suffit largement pour un message court. -N désactive le
+  # buffering curl côté client pour qu'on lise les events au fil de l'eau,
+  # même si on ne les exploite pas (on cherche juste le terminal event).
+  resp_c_http=$(curl -sS -N --max-time 30 ${BYPASS_ARGS[@]+"${BYPASS_ARGS[@]}"} \
+    -o "${responses_stream_tmp}" -w "%{http_code}" \
+    -H "Authorization: Bearer ${API_KEY}" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "model": "claude-proxy-haiku-4.5",
+      "input": "Say OK",
+      "stream": true,
+      "max_output_tokens": 32
+    }' \
+    "${BASE_URL}/responses" || true)
+
+  if [[ "${NO_OAUTH_MODE}" == "1" ]]; then
+    if [[ "${resp_c_http}" == "401" ]] && grep -q 'OAuth' "${responses_stream_tmp}" 2>/dev/null; then
+      echo "OK (401 OAuth attendu)"
+    else
+      echo "FAIL HTTP ${resp_c_http}"
+      cat "${responses_stream_tmp}" || true
+      exit 1
+    fi
+  elif [[ "${resp_c_http}" != "200" ]]; then
+    echo "FAIL HTTP ${resp_c_http}"
+    cat "${responses_stream_tmp}" || true
+    exit 1
+  else
+    # Vérifie la présence des events terminaux du protocole Responses :
+    #   - response.created  : émis à l'ouverture
+    #   - response.completed: émis à la fermeture (porte le payload final)
+    if ! grep -q '^event: response.created' "${responses_stream_tmp}"; then
+      echo "FAIL — pas d'event response.created dans le stream"
+      head -c 1000 "${responses_stream_tmp}"
+      exit 1
+    fi
+    if ! grep -q '^event: response.completed' "${responses_stream_tmp}"; then
+      echo "FAIL — pas d'event response.completed dans le stream (stream tronqué ?)"
+      head -c 1000 "${responses_stream_tmp}"
+      exit 1
+    fi
+    delta_count=$(grep -c '^event: response.output_text.delta' "${responses_stream_tmp}" || true)
+    echo "OK (200) — SSE valide : response.created + ${delta_count} delta(s) + response.completed"
+  fi
+  echo ""
+fi
 
 echo "Tout est OK."
