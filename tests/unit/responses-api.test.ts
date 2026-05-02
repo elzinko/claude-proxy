@@ -250,7 +250,23 @@ describe('responsesRequestToAnthropic — content block type mapping', () => {
     expect(assistantContent).toEqual([{ type: 'text', text: 'hi there' }])
   })
 
-  it('maps input_image blocks to image', () => {
+  it('maps input_image with string image_url to Anthropic url source', () => {
+    const result = responsesRequestToAnthropic({
+      model: 'claude-sonnet-4-6',
+      input: [
+        { role: 'user', content: [
+          { type: 'input_image', image_url: 'https://example.com/img.png', detail: 'auto' },
+        ] },
+      ],
+    })
+    const block = (result.messages[0] as any).content[0]
+    expect(block).toEqual({
+      type: 'image',
+      source: { type: 'url', url: 'https://example.com/img.png' },
+    })
+  })
+
+  it('maps input_image with {url} wrapper to Anthropic url source', () => {
     const result = responsesRequestToAnthropic({
       model: 'claude-sonnet-4-6',
       input: [
@@ -260,21 +276,86 @@ describe('responsesRequestToAnthropic — content block type mapping', () => {
       ],
     })
     const block = (result.messages[0] as any).content[0]
-    expect(block.type).toBe('image')
-    expect(block.source).toEqual({ url: 'https://example.com/img.png' })
+    expect(block.source).toEqual({ type: 'url', url: 'https://example.com/img.png' })
   })
 
-  it('maps input_file blocks to document', () => {
+  it('maps input_image with data: URL to Anthropic base64 source', () => {
     const result = responsesRequestToAnthropic({
       model: 'claude-sonnet-4-6',
       input: [
         { role: 'user', content: [
-          { type: 'input_file', file: { id: 'file_1' } },
+          { type: 'input_image', image_url: 'data:image/png;base64,iVBORw0KGgo=' },
         ] },
       ],
     })
     const block = (result.messages[0] as any).content[0]
-    expect(block.type).toBe('document')
+    expect(block.source).toEqual({
+      type: 'base64',
+      media_type: 'image/png',
+      data: 'iVBORw0KGgo=',
+    })
+  })
+
+  it('drops input_image with unrecognized source shape', () => {
+    const result = responsesRequestToAnthropic({
+      model: 'claude-sonnet-4-6',
+      input: [
+        { role: 'user', content: [
+          { type: 'input_image' },
+          { type: 'input_text', text: 'fallback' },
+        ] },
+      ],
+    })
+    const content = (result.messages[0] as any).content
+    expect(content).toHaveLength(1)
+    expect(content[0].type).toBe('text')
+  })
+
+  it('maps input_file with file_data data URL to Anthropic base64 document source', () => {
+    const result = responsesRequestToAnthropic({
+      model: 'claude-sonnet-4-6',
+      input: [
+        { role: 'user', content: [
+          { type: 'input_file', file_data: 'data:application/pdf;base64,JVBERi0xLjQK' },
+        ] },
+      ],
+    })
+    const block = (result.messages[0] as any).content[0]
+    expect(block).toEqual({
+      type: 'document',
+      source: { type: 'base64', media_type: 'application/pdf', data: 'JVBERi0xLjQK' },
+    })
+  })
+
+  it('maps input_file with file_url to Anthropic url document source', () => {
+    const result = responsesRequestToAnthropic({
+      model: 'claude-sonnet-4-6',
+      input: [
+        { role: 'user', content: [
+          { type: 'input_file', file_url: 'https://example.com/doc.pdf' },
+        ] },
+      ],
+    })
+    const block = (result.messages[0] as any).content[0]
+    expect(block).toEqual({
+      type: 'document',
+      source: { type: 'url', url: 'https://example.com/doc.pdf' },
+    })
+  })
+
+  it('drops input_file with only file_id (cannot resolve OpenAI storage)', () => {
+    const result = responsesRequestToAnthropic({
+      model: 'claude-sonnet-4-6',
+      input: [
+        { role: 'user', content: [
+          { type: 'input_file', file_id: 'file_abc123' },
+          { type: 'input_text', text: 'see attached' },
+        ] },
+      ],
+    })
+    const content = (result.messages[0] as any).content
+    expect(content).toHaveLength(1)
+    expect(content[0].type).toBe('text')
   })
 
   it('strips input_audio blocks (unsupported)', () => {
