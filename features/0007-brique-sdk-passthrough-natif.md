@@ -57,6 +57,22 @@ qu'une **clé aval révocable par appli** (cf. [[0006-mcp-controle-tokens]], [[0
 - [ ] Un projet SDK démarre en **2 variables d'env** (procédure affichée, cf. [[0002-reponse-401-explicite-token-doc]])
 - [ ] Parité minimale avec la surface OpenAI-compat : streaming, `cache_control`, betas
 
+## Review adverse (2026-08-01) — ⚠️ casse le « quasi un forward »
+
+- **Vrai bug** : le passthrough **préfixe** « You are Claude Code… » au system prompt
+  de l'appelant (`server.ts:1067` ; origine détectée sur `system[0]`). On ne peut pas
+  garder le marker requis par l'abonnement **ET** le prompt appelant verbatim → « base_url
+  + token, tout langage » **change le comportement du modèle en silence**.
+- **Fuite d'identité d'org** : headers amont renvoyés quasi verbatim (`server.ts:888,987`)
+  → `anthropic-organization-id`, `request-id` ([[0008-durcissement-securite-trous-live]] TL8).
+- **Escalade CGU** : une API Anthropic **native générique** sur abonnement, pour N
+  programmes headless, ressemble **plus** à de la revente que le cas Cursor.
+
+**Arbitrage PO (surface B)** : **différer** cette fiche, ou en faire un **shim par langage
+honnête** (qui possède le marker/beta/UA + allowlist de headers, ≈ Option C de l'ADR) **+
+scope localhost/1 projet** — pas une brique « pointe tous tes projets ici ». **Ne pas
+poser `ready` avant cet arbitrage.**
+
 ## Notes / décisions
 
 - 2026-08-01 : issu de la question ouverte de l'utilisateur ; tranché en surface **B**

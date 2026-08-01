@@ -48,6 +48,16 @@ d'attaque + non-déterminisme). Composants :
 - [ ] Runbook de révocation amont écrit et testé (le token copié cesse de marcher)
 - [ ] Aucun LLM dans le chemin du kill-switch
 
+## Review adverse (2026-08-01)
+
+Absorbe des **must-fix** de [ADR-0001](../docs/adr/ADR-0001-noyau-auth-elicitation-surfaces-livraison.md) :
+- **MF1** — révoquer sur le **key-id**, dans `require-api-key`, sur **toutes** les routes (admin incluse). ⚠️ **Ne PAS** enforcer sur `sha256(api_key+ip)` (self-unrevoke + dodge par IP/XFF) — ce fingerprint = **affichage seul**.
+- **MF2** — `/api/clients/*`, `/api/stats`, `/api/status/*` **et toutes** les mutations `/auth/*` derrière le secret admin (pas que `/auth/logout`).
+- **MF3** — **fail-closed** : deny sur erreur Redis ; refus si registre vide.
+- **MF4** — `/auth/oauth/callback` non-auth laisse **écraser** le token amont (pas juste le wiper).
+
+Trous *live* correspondants → [[0008-durcissement-securite-trous-live]] (P0 : TL1/TL3/TL5).
+
 ## Notes / décisions
 
 - Issu de la discussion archi/sécu du 2026-08-01. Rattaché à l'épic [[0005-gestion-tokens-mcp-elicitation]].

@@ -75,6 +75,16 @@ sans élicitation) :
   analysé : `gateway/elicitation.py`, `gateway/api.py`, `gateway/mcp_server.py`,
   `gateway/vault.py`, `gateway/broker_server.py`, `docs/adr/ADR-0005-elicitation-signee-v2.md`).
 
+## Review adverse (2026-08-01)
+
+Must-fix de [ADR-0001](../docs/adr/ADR-0001-noyau-auth-elicitation-surfaces-livraison.md) à intégrer :
+- **MF5** — `token_mint` **ne renvoie JAMAIS la clé** au canal LLM (seulement un pointeur `key show <label>` en terminal local) ; sinon le modèle lit le secret → casse « propose-command, never execute ». Test : dump du résultat d'outil → 0 matériel de clé.
+- **MF6** — nonce anti-rejeu en **Redis `SET NX EX`** (google-mcp = fichier local mono-instance → **rejouable** en serverless multi-instance) ; **signature obligatoire** à l'apply (secret admin = transport, jamais suffisant) ; payload lié **key-id + compteur de génération + TTL** (anti-TOCTOU).
+- **MF7** — « le LLM n'a jamais la main » n'est vrai que pour un LLM **coopératif dans le canal MCP** ; shell/même-UID contourne (V1 mock-HMAC signable par le proposeur). Claim fort ⇒ clé **non-exportable Secure Enclave** + shell agent durci.
+- **MF1** — révocation **par key-id** (cf. [[0004-kill-switch-gardien]]).
+
+**Arbitrage PO (ambition V1)** : un reviewer juge ce plan de contrôle **sur-dimensionné** — il garde le secret *pas cher* (clés aval révocables), pas le secret *cher* (token amont, non protégeable par élicitation, shell bypass). Option : **V1 = `/admin/keys` derrière un secret admin** (registre key-id + fail-closed) ; **élicitation signée + biométrie = V2 (durcissement)**.
+
 ## Notes / décisions
 
 - Adaptation Vercel : le MCP + l'élicitation/biométrie sont **locaux** ; le proxy
