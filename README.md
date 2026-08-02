@@ -1,4 +1,4 @@
-# Cursor Claude Connector
+# claude-proxy
 
 A proxy that lets you use your **Claude Pro/Max subscription** in Cursor IDE — no additional API costs.
 
@@ -16,7 +16,7 @@ Cursor sends OpenAI-compatible requests to the proxy. The proxy authenticates wi
 
 ### 1. Deploy to Vercel
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/elzinko/cursor-claude-connector&env=API_KEY&envDescription=Secret%20key%20to%20protect%20your%20proxy&integration-ids=oac_V3R1GIpkoJorr6fqyiwdhl17)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/elzinko/claude-proxy&env=API_KEY&envDescription=Secret%20key%20to%20protect%20your%20proxy&integration-ids=oac_V3R1GIpkoJorr6fqyiwdhl17)
 
 - Set `API_KEY` to any secret string you choose (e.g. `my-secret-key-123`)
 - Add **Upstash Redis** from Vercel Marketplace (required for token storage)
