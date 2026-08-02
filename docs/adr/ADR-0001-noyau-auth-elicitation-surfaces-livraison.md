@@ -146,8 +146,8 @@ l'ordre V1-minimal → V2 (arbitrage 2).
 
 ## Action Items
 
-1. [ ] **Fermer les trous live (fiche 0008, P0)** — indépendant de l'épic ; repo public déployé.
+1. [~] **Fermer les trous live (fiche 0008, P0)** — **décidé 2026-08-02 (PO) : PR sécu urgente séparée, EN COURS** (TL1–TL4 + mutations admin ; relue avant merge).
 2. [x] Passer l'ADR en review adverse.
-3. [ ] **Arbitrage PO 1** : surface B — différer / scoper / garder ?
-4. [ ] **Arbitrage PO 2** : V1 minimal (secret admin) vs V1 avec élicitation signée ?
-5. [ ] Intégrer MF1–MF7 dans 0004/0006 ; puis `ready:` ; puis `Accepted`.
+3. [ ] **Arbitrage PO 1** : surface B — différer / scoper / garder ? *(ré-explication en cours ; reco = différer)*
+4. [x] **Arbitrage PO 2** — **décidé 2026-08-02 (PO) : élicitation signée DÈS la V1.** Les must-fix restent obligatoires : MF5 (`token_mint` ne renvoie pas la clé au LLM), MF6 (nonce Redis atomique + signature obligatoire + binding key-id/génération/TTL), MF7 (claim « no-LLM » borné au canal coopératif ; clé non-exportable Secure Enclave pour un claim fort).
+5. [ ] Intégrer MF1–MF7 dans 0004/0006 ; puis `ready:` ; puis `Accepted` (bloqué sur l'arbitrage 1).
