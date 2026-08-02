@@ -716,8 +716,21 @@
       }
 
       async function logout() {
+        // /auth/logout is now protected (it deletes the OAuth token): send the API key.
+        const key = document.getElementById('apiKeyInput').value.trim()
+        if (!key) {
+          showAuthError('Enter your API key (field below) to sign out.')
+          return
+        }
         try {
-          await fetch('/auth/logout', { method: 'POST' })
+          const res = await fetch('/auth/logout', {
+            method: 'POST',
+            headers: { Authorization: 'Bearer ' + key },
+          })
+          if (!res.ok) {
+            showAuthError(res.status === 401 ? 'Invalid API key.' : 'Failed to sign out')
+            return
+          }
           await refreshStatus()
         } catch (err) {
           showAuthError('Failed to sign out')
