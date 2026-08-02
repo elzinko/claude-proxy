@@ -226,6 +226,12 @@ app.post('/auth/login/start', async (c: Context) => {
 })
 
 app.post('/auth/logout', async (c: Context) => {
+  // Require a valid API key: this endpoint deletes the stored Anthropic OAuth
+  // token, so leaving it open lets anyone wipe it (unauthenticated DoS).
+  const keyResult = validateApiKey(c)
+  if (!keyResult.ok) {
+    return c.json(keyResult.body, keyResult.status)
+  }
   try {
     await oauthLogout()
     return c.json<SuccessResponse>({
