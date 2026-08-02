@@ -17,7 +17,7 @@
 
 | # | Titre | Type | Prio | Statut | Épic | PR |
 |---|-------|------|------|--------|------|----|
-| [0008](0008-durcissement-securite-trous-live.md) | **Durcissement sécurité — trous LIVE confirmés (repo public déployé)** | bug | **P0** | 🔴 todo | — | — |
+| [0008](0008-durcissement-securite-trous-live.md) | **Durcissement sécurité — trous LIVE (repo public déployé)** | bug | **P0** | 🟠 in-progress | — | [#17](https://github.com/elzinko/cursor-claude-connector/pull/17) (TL1-4) |
 | [0004](0004-kill-switch-gardien.md) | Kill-switch / gardien — révocation (par appli / global / amont) + fix `/auth/*` | feature | P1 | 🔴 todo | 0005 | — |
 | [0006](0006-mcp-controle-tokens.md) | MCP local — mint/list/revoke des tokens par appli + élicitation signée | feature | P1 | 🔴 todo | 0005 | — |
 | [0007](0007-brique-sdk-passthrough-natif.md) | Brique SDK — passthrough Anthropic natif (⚠️ arbitrage PO : différer/scoper) | feature | P1 | 🔴 todo | 0005 | — |

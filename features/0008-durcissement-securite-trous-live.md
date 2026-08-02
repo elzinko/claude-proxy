@@ -16,6 +16,12 @@ created: 2026-08-01
 > red-teamers (2026-08-01), ancrés dans `src/`. Voir must-fix de
 > [ADR-0001](../docs/adr/ADR-0001-noyau-auth-elicitation-surfaces-livraison.md).
 
+## Statut (2026-08-02)
+
+**TL1–TL4 livrés → [PR #17](https://github.com/elzinko/cursor-claude-connector/pull/17)** (branche `feat/0008-security-hardening`, off `main`) : auth admin sur `/auth/logout` + `/auth/login/start`, CSRF du callback OAuth par `state` serveur à usage unique, fail-closed si `API_KEY` absent + compare constant-time, `isRevoked` fail-closed, lock single-flight du refresh. Typecheck + 126 tests verts (+9). ⚠️ nouvel env **`ADMIN_SECRET`** requis ; bouton « Disconnect » de l'UI à mettre à jour.
+
+**Restants :** **TL5** (mutations/lectures `/api/clients` hors tier clé-client) → à livrer **avec le registre de clés par appli** ([[0006-mcp-controle-tokens]]) car pas encore exploitable à clé unique ; **TL6** (rate-limiter Redis), **TL7** (amplification IPINFO), **TL8** (allowlist headers réponse) + `/auth/status` info-leak → follow-up.
+
 ## Trous confirmés
 
 | # | Trou | Impact | Pointeur | Fix |
