@@ -5,7 +5,7 @@ type: feature
 priority: P2
 epic: 0005
 status: todo
-ready:
+ready: 2026-08-03
 pr:
 created: 2026-08-01
 ---

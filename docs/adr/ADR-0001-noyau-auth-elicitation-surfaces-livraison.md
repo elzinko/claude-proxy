@@ -1,6 +1,6 @@
 # ADR-0001 : Noyau "auth abonnement + élicitation", séparé de ses surfaces de livraison
 
-**Status:** Proposed — **amendé après review adverse** (3 red-teamers, 2026-08-01) ; **2 arbitrages PO ouverts** avant `Accepted`
+**Status:** **Accepted** (2026-08-03) — amendé après review adverse (3 red-teamers, 2026-08-01) ; arbitrages PO tranchés : **élicitation signée dès la V1**, **surface B différée**. Les must-fix **MF1–MF7** sont des contraintes de build suivies dans 0004/0006.
 **Date:** 2026-08-01
 **Deciders:** elzinko (PO)
 **Épic:** [0005](../../features/0005-gestion-tokens-mcp-elicitation.md) · **Fiches:** 0002, 0003, 0004, 0006, 0007, **0008 (trous live)**
@@ -148,6 +148,6 @@ l'ordre V1-minimal → V2 (arbitrage 2).
 
 1. [~] **Fermer les trous live (fiche 0008, P0)** — **décidé 2026-08-02 (PO) : PR sécu urgente séparée, EN COURS** (TL1–TL4 + mutations admin ; relue avant merge).
 2. [x] Passer l'ADR en review adverse.
-3. [ ] **Arbitrage PO 1** : surface B — différer / scoper / garder ? *(ré-explication en cours ; reco = différer)*
+3. [x] **Arbitrage PO 1** — **décidé 2026-08-03 (PO) : DIFFÉRER la surface B** (fiche 0007 → `idea`). Brique = clé aval + proxy OpenAI-compat pour l'instant ; pas de passthrough natif générique tant que le marker « You are Claude Code » et le risque CGU ne sont pas réglés.
 4. [x] **Arbitrage PO 2** — **décidé 2026-08-02 (PO) : élicitation signée DÈS la V1.** Les must-fix restent obligatoires : MF5 (`token_mint` ne renvoie pas la clé au LLM), MF6 (nonce Redis atomique + signature obligatoire + binding key-id/génération/TTL), MF7 (claim « no-LLM » borné au canal coopératif ; clé non-exportable Secure Enclave pour un claim fort).
-5. [ ] Intégrer MF1–MF7 dans 0004/0006 ; puis `ready:` ; puis `Accepted` (bloqué sur l'arbitrage 1).
+5. [ ] Intégrer MF1–MF7 comme contraintes de build dans 0004/0006 ; construire la V1 (registre key-id + plan admin + élicitation signée).

@@ -4,7 +4,7 @@ title: Brique SDK — passthrough Anthropic natif + base_url + clé par appli
 type: feature
 priority: P1
 epic: 0005
-status: todo
+status: idea
 ready:
 pr:
 created: 2026-08-01
@@ -16,6 +16,11 @@ created: 2026-08-01
 > [ADR-0001](../docs/adr/ADR-0001-noyau-auth-elicitation-surfaces-livraison.md).
 > Répond à : « comment un nouveau projet qui appelle Claude **via le SDK** réutilise
 > une brique de ce projet, sans réimplémenter l'auth abonnement (+ élicitation) ? »
+
+> ⏸️ **DIFFÉRÉE — décision PO du 2026-08-03 (arbitrage A de l'ADR-0001).** Parkée
+> en `idea` : on garde la brique = clé aval + proxy OpenAI-compat pour l'instant.
+> À rouvrir quand le bug du marker « You are Claude Code » et le risque CGU seront
+> tranchés (cf. Review adverse ci-dessous).
 
 ## Contexte / Problème
 
