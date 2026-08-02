@@ -1,3 +1,4 @@
+import crypto from 'node:crypto'
 import { Redis } from '@upstash/redis'
 import * as fileStorage from './file-storage'
 
@@ -122,7 +123,9 @@ async function getAll(): Promise<AuthData> {
   }
 }
 
-async function refreshToken(
+const REFRESH_LOCK_KEY = 'auth:anthropic:refresh-lock'
+
+async function doRefresh(
   credentials: OAuthCredentials,
 ): Promise<string | null> {
   try {
@@ -167,6 +170,94 @@ async function refreshToken(
     console.error('Error refreshing token:', error)
     return null
   }
+}
+
+// TL4 (0008): single-flight refresh. Concurrent serverless cold-starts must NOT
+// both POST the refresh grant — Anthropic rotates the refresh_token, so a
+// double-refresh leaves the loser holding a stale token (last-write-wins) and
+// can drop ALL clients until a manual browser re-auth. In Redis mode we take a
+// short lock; the loser waits for the winner's fresh creds instead of
+// refreshing again. File storage is a single local process, so no lock needed.
+async function refreshToken(
+  credentials: OAuthCredentials,
+): Promise<string | null> {
+  if (!redis) {
+    return doRefresh(credentials)
+  }
+
+  const lockVal = crypto.randomBytes(16).toString('hex')
+  let acquired = false
+  try {
+    acquired =
+      (await redis.set(REFRESH_LOCK_KEY, lockVal, { nx: true, px: 10_000 })) ===
+      'OK'
+
+    if (!acquired) {
+      // Another instance is refreshing — poll briefly for its fresh creds.
+      for (let i = 0; i < 16; i++) {
+        await new Promise((r) => setTimeout(r, 500))
+        const fresh = await get()
+        if (fresh && fresh.access && fresh.expires > Date.now()) {
+          return fresh.access
+        }
+      }
+      // Winner never produced fresh creds (crashed?) — best-effort refresh.
+      return doRefresh(credentials)
+    }
+
+    // We hold the lock. Re-check: a prior holder may have just refreshed.
+    const current = await get()
+    if (current && current.access && current.expires > Date.now()) {
+      return current.access
+    }
+    return await doRefresh(credentials)
+  } finally {
+    if (acquired) {
+      try {
+        // Release only if we still own the lock (best-effort; else it expires).
+        const owner = await redis.get<string>(REFRESH_LOCK_KEY)
+        if (owner === lockVal) await redis.del(REFRESH_LOCK_KEY)
+      } catch {
+        /* lock auto-expires via px */
+      }
+    }
+  }
+}
+
+// ── OAuth CSRF state store (0008 TL1) ────────────────────────────────────
+// Maps a server-issued random `state` → the PKCE verifier of that flow. The
+// callback must present a state WE issued (via /auth/oauth/start), or it is
+// rejected. This stops an attacker from POSTing an unsolicited callback — with
+// a code+verifier from THEIR own Anthropic account — to overwrite the stored
+// upstream credential (integrity attack, not just DoS).
+const OAUTH_STATE_TTL_SECONDS = 600
+const kOAuthState = (state: string) => `oauth:state:${state}`
+const memOAuthState = new Map<string, { verifier: string; exp: number }>()
+
+async function setOAuthState(state: string, verifier: string): Promise<void> {
+  if (useFileStorage) {
+    memOAuthState.set(state, {
+      verifier,
+      exp: Date.now() + OAUTH_STATE_TTL_SECONDS * 1000,
+    })
+    return
+  }
+  await redis!.set(kOAuthState(state), verifier, { ex: OAUTH_STATE_TTL_SECONDS })
+}
+
+// Single-use: returns the verifier and deletes the state so it can't be replayed.
+async function takeOAuthState(state: string): Promise<string | null> {
+  if (!state) return null
+  if (useFileStorage) {
+    const entry = memOAuthState.get(state)
+    memOAuthState.delete(state)
+    if (!entry || entry.exp < Date.now()) return null
+    return entry.verifier
+  }
+  const key = kOAuthState(state)
+  const verifier = await redis!.get<string>(key)
+  if (verifier) await redis!.del(key)
+  return verifier ?? null
 }
 
 async function getAccessToken(): Promise<string | null> {
@@ -230,4 +321,6 @@ export {
   getAccessToken,
   getTokenMetadata,
   redactUpstashError,
+  setOAuthState,
+  takeOAuthState,
 }

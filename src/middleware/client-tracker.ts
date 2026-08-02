@@ -149,8 +149,12 @@ async function isRevoked(fp: string): Promise<boolean> {
     const res = await redis.sismember(K_REVOKED, fp)
     return res === 1
   } catch (err) {
-    console.error('[client-tracker] isRevoked failed:', err)
-    return false
+    // TL3 (0008): fail CLOSED. If we cannot confirm a fingerprint is NOT
+    // revoked (Redis error/outage), deny rather than allow — otherwise a
+    // revoked/attacker key slips through during any Redis blip. This couples
+    // request availability to Redis liveness by design (security > uptime here).
+    console.error('[client-tracker] isRevoked failed — failing CLOSED (deny):', err)
+    return true
   }
 }
 

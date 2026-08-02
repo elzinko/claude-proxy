@@ -10,7 +10,7 @@ import { printStatusline } from './utils/statusline'
 import { statsRouter } from './routes/stats'
 import { statusRouter } from './routes/status'
 import { clientsRouter } from './routes/clients'
-import { isApiKeyConfigured, validateApiKey } from './middleware/require-api-key'
+import { isApiKeyConfigured, validateApiKey, requireAdmin } from './middleware/require-api-key'
 import {
   tracker,
   fingerprint as computeFingerprint,
@@ -196,7 +196,7 @@ app.post('/auth/oauth/callback', async (c: Context) => {
   }
 })
 
-app.post('/auth/login/start', async (c: Context) => {
+app.post('/auth/login/start', requireAdmin, async (c: Context) => {
   try {
     console.log('\n Starting OAuth authentication flow...')
     const result = await oauthLogin()
@@ -225,7 +225,7 @@ app.post('/auth/login/start', async (c: Context) => {
   }
 })
 
-app.post('/auth/logout', async (c: Context) => {
+app.post('/auth/logout', requireAdmin, async (c: Context) => {
   try {
     await oauthLogout()
     return c.json<SuccessResponse>({
