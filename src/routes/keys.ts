@@ -52,6 +52,21 @@ keysRouter.get('/', async (c) => {
   }
 })
 
+// POST /api/keys/revoke-all — global downstream kill (0004): revoke EVERY
+// per-app key at once. Static path, so it never collides with /:keyId/revoke
+// (that route needs two segments). Idempotent; returns the count newly revoked.
+keysRouter.post('/revoke-all', async (c) => {
+  try {
+    const revoked = await registry.revokeAll()
+    return c.json({ revoked })
+  } catch (err) {
+    return c.json(
+      { error: 'Revoke-all failed', message: (err as Error).message },
+      500,
+    )
+  }
+})
+
 // POST /api/keys/:keyId/revoke — idempotent revoke by key-id.
 keysRouter.post('/:keyId/revoke', async (c) => {
   const keyId = c.req.param('keyId')

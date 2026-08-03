@@ -157,6 +157,23 @@ describe('validateApiKey — registry (cxk_) branch', () => {
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.status).toBe(401)
   })
+
+  // Kept LAST in this block: revokeAll() disables EVERY registry key, so any
+  // later cxk_ test would otherwise start from an all-revoked registry.
+  it('revokeAll() kills every key — global downstream revoke (0004)', async () => {
+    const a = await registry.mint('kill-a')
+    const b = await registry.mint('kill-b')
+    expect((await validateApiKey(ctx(`Bearer ${a.key}`))).ok).toBe(true)
+
+    const n = await registry.revokeAll()
+    expect(n).toBeGreaterThanOrEqual(2)
+
+    for (const k of [a.key, b.key]) {
+      const r = await validateApiKey(ctx(`Bearer ${k}`))
+      expect(r.ok).toBe(false)
+      if (!r.ok) expect(r.status).toBe(401)
+    }
+  })
 })
 
 describe('validateAdmin — TL1 admin plane, fail-closed', () => {

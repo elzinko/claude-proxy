@@ -200,6 +200,44 @@ async function unrevokeKey(keyId: string): Promise<boolean> {
   return setStatus(keyId, 'active')
 }
 
+// ── revokeAll (0004 global kill — flip EVERY key to revoked, by key-id) ──
+// The downstream "revoke for everything": disables all per-app keys at once so
+// no client can authenticate. Returns the count of keys newly revoked. Does NOT
+// touch the env API_KEY (that is rotated via the environment) nor the upstream
+// Anthropic token (see SECURITY.md — that revocation is a manual claude.ai step).
+async function revokeAll(): Promise<number> {
+  if (!redis) {
+    let n = 0
+    for (const rec of memRegistry.values()) {
+      if (rec.status !== 'revoked') {
+        rec.status = 'revoked'
+        n++
+      }
+    }
+    return n
+  }
+  try {
+    const map = (await redis.hgetall(K_REGISTRY)) as Record<
+      string,
+      unknown
+    > | null
+    if (!map) return 0
+    const updates: Record<string, string> = {}
+    let n = 0
+    for (const [keyId, raw] of Object.entries(map)) {
+      const rec = decode<KeyRecord>(raw)
+      if (!rec || rec.status === 'revoked') continue
+      updates[keyId] = JSON.stringify({ ...rec, keyId, status: 'revoked' })
+      n++
+    }
+    if (n > 0) await redis.hset(K_REGISTRY, updates)
+    return n
+  } catch (err) {
+    console.error('[key-registry] revokeAll failed:', redactUpstashError(err as Error))
+    throw new Error('Failed to revoke all API keys')
+  }
+}
+
 // ── touchLastUsed (telemetry — throttled, fire-and-forget, never denies) ─
 const TOUCH_THROTTLE_MS = 60_000
 const touchThrottle = new Map<string, number>()
@@ -243,6 +281,7 @@ export const registry = {
   getKey,
   revokeKey,
   unrevokeKey,
+  revokeAll,
   touchLastUsed,
   hasAnyKey,
   hasRedis,
