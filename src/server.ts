@@ -14,6 +14,7 @@ import { keysRouter } from './routes/keys'
 import {
   isApiKeyConfiguredAsync,
   validateApiKey,
+  validateAdmin,
   requireAdmin,
 } from './middleware/require-api-key'
 import {
@@ -122,13 +123,13 @@ app.get('/index.html', async (c) => {
   return c.html(html)
 })
 
-// Stats API (protected by API_KEY)
+// Stats API — cross-project usage/logs (ADMIN_SECRET only — TL5 0008)
 app.route('/api/stats', statsRouter)
 
-// Status API — full dashboard JSON (protected by API_KEY)
+// Status API — full dashboard JSON incl. token metadata (ADMIN_SECRET only — TL5 0008)
 app.route('/api/status', statusRouter)
 
-// Clients API — per-fingerprint list, daily usage, revoke/unrevoke (protected)
+// Clients API — per-fingerprint list, daily usage, revoke/unrevoke (ADMIN_SECRET only — TL5 0008)
 app.route('/api/clients', clientsRouter)
 
 // Keys API — per-app key registry: mint/list/revoke (ADMIN_SECRET only)
@@ -259,34 +260,46 @@ app.post('/auth/logout', requireAdmin, async (c: Context) => {
 })
 
 app.get('/auth/status', async (c: Context) => {
-  const info = getDeploymentInfo()
-  const warnings = getDeploymentWarnings()
-  const deployment = {
-    platform: info.platform,
-    vercelEnv: info.vercelEnv,
-    region: info.region,
-    warnings,
+  // TL1 (0008): this endpoint is intentionally UNAUTHENTICATED so the public
+  // landing can show a connected / not-connected indicator. But the full
+  // metadata (token expiry, refresh-token presence, storage mode, region,
+  // deployment warnings) is owner-only reconnaissance for anyone hitting a
+  // deployed proxy. Non-admins get a BARE payload; the full detail requires the
+  // admin secret (the landing re-fetches with it once the owner authenticates).
+  const isAdmin = validateAdmin(c).ok
+
+  // Computed independently of the token fetch so a getTokenMetadata() failure
+  // never zeroes it (it drives the "API key configured" badge on the landing).
+  const apiKeyConfigured = await isApiKeyConfiguredAsync().catch(() => false)
+
+  const adminDeployment = () => {
+    const info = getDeploymentInfo()
+    return {
+      platform: info.platform,
+      vercelEnv: info.vercelEnv,
+      region: info.region,
+      warnings: getDeploymentWarnings(),
+    }
   }
 
   try {
-    const [metadata, apiKeyConfigured] = await Promise.all([
-      getTokenMetadata(),
-      isApiKeyConfiguredAsync(),
-    ])
-    return c.json({
-      ...metadata,
-      apiKeyConfigured,
-      deployment,
-    })
+    const metadata = await getTokenMetadata()
+    if (!isAdmin) {
+      return c.json({ authenticated: metadata.authenticated, apiKeyConfigured })
+    }
+    return c.json({ ...metadata, apiKeyConfigured, deployment: adminDeployment() })
   } catch (error) {
+    if (!isAdmin) {
+      return c.json({ authenticated: false, apiKeyConfigured })
+    }
     return c.json({
       authenticated: false,
       expiresAt: null,
       expiresInSeconds: null,
       hasRefreshToken: false,
       storageMode: getEffectiveStorageMode(),
-      apiKeyConfigured: await isApiKeyConfiguredAsync(),
-      deployment,
+      apiKeyConfigured,
+      deployment: adminDeployment(),
     })
   }
 })

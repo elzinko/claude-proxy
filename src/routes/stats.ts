@@ -1,11 +1,14 @@
 import { Hono } from 'hono'
 import { logger } from '../middleware/request-logger'
 import { rateLimiter } from '../middleware/rate-limiter'
-import { requireApiKey } from './../middleware/require-api-key'
+import { requireAdmin } from './../middleware/require-api-key'
 
+// TL5 (0008): usage stats and logs aggregate EVERY project's traffic, so they
+// leak one app's activity to any other key holder. Gate the whole router behind
+// ADMIN_SECRET — this is owner telemetry, not a client-tier read.
 export const statsRouter = new Hono()
 
-statsRouter.use('*', requireApiKey)
+statsRouter.use('*', requireAdmin)
 
 // GET /stats - Get usage statistics
 statsRouter.get('/', (c) => {

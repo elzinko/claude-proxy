@@ -505,10 +505,10 @@
       </section>
 
       <section class="section">
-        <div class="section-title"><span>Full dashboard (API key required)</span></div>
+        <div class="section-title"><span>Full dashboard (admin secret required)</span></div>
         <div class="input-group">
-          <label for="apiKeyInput">API key</label>
-          <input type="password" id="apiKeyInput" placeholder="Bearer token" autocomplete="off" />
+          <label for="apiKeyInput">Admin secret</label>
+          <input type="password" id="apiKeyInput" placeholder="ADMIN_SECRET (not a client key)" autocomplete="off" />
         </div>
         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
           <button class="button-secondary" style="flex: 1;" onclick="loadFullStatus()">
@@ -650,7 +650,14 @@
 
       async function refreshStatus() {
         try {
-          const res = await fetch('/auth/status')
+          // /auth/status returns a bare {authenticated, apiKeyConfigured} to the
+          // public; the full detail (expiry, storage, region, warnings) is
+          // owner-only. Send the admin secret when the field is filled so the
+          // owner's dashboard shows the complete status.
+          const key = document.getElementById('apiKeyInput').value.trim()
+          const res = await fetch('/auth/status', {
+            headers: key ? { Authorization: 'Bearer ' + key } : {},
+          })
           renderStatus(await res.json())
         } catch (err) {
           showAuthError('Failed to fetch status')
