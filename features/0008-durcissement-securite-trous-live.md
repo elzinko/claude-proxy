@@ -20,7 +20,9 @@ created: 2026-08-01
 
 **TL1–TL4 livrés → [PR #17](https://github.com/elzinko/cursor-claude-connector/pull/17)** (branche `feat/0008-security-hardening`, off `main`) : auth admin sur `/auth/logout` + `/auth/login/start`, CSRF du callback OAuth par `state` serveur à usage unique, fail-closed si `API_KEY` absent + compare constant-time, `isRevoked` fail-closed, lock single-flight du refresh. Typecheck + 126 tests verts (+9). ⚠️ nouvel env **`ADMIN_SECRET`** requis ; bouton « Disconnect » de l'UI à mettre à jour.
 
-**Restants :** **TL5** (mutations/lectures `/api/clients` hors tier clé-client) → à livrer **avec le registre de clés par appli** ([[0006-mcp-controle-tokens]]) car pas encore exploitable à clé unique ; **TL6** (rate-limiter Redis), **TL7** (amplification IPINFO), **TL8** (allowlist headers réponse) + `/auth/status` info-leak → follow-up.
+**TL5 livré** (registre 0006 en #20 pour les **mutations** revoke/unrevoke ; **lectures** `/api/clients`, `/api/clients/daily`, `/api/stats/*`, `/api/status/full` passées **tier admin** + `/auth/status` info-leak réduit à `{authenticated, apiKeyConfigured}` hors admin → PR 0008-info-leak-tier). Dashboard non cassé (le champ était déjà le secret admin). **+6 tests (158).**
+
+**Restants :** **TL6** (rate-limiter Redis par key-id — dépend d'un choix de politique de quotas), **TL7** (amplification IPINFO via XFF spoofé — skip pour bloqués/révoqués + cap par key-id), **TL8** (allowlist des headers de réponse — anti-fuite `anthropic-organization-id`/`request-id`) → follow-up.
 
 ## Trous confirmés
 
@@ -50,7 +52,7 @@ created: 2026-08-01
 - [ ] Registre vide sur toute plateforme → `/v1/messages` **jamais servi** (401/500)
 - [ ] Erreur Redis simulée → révocation **deny** (fail-closed)
 - [ ] Deux refresh concurrents → **un seul** grant effectif (lock), pas de panne
-- [ ] Clé client → **403** sur `/api/clients`, `/api/stats`, `/api/status/full`
+- [x] Clé client → **401** sur `/api/clients`, `/api/stats`, `/api/status/full` (tier admin) + `/auth/status` sans admin ne renvoie que `{authenticated, apiKeyConfigured}`
 - [ ] Réponse surface B → **aucun** `anthropic-organization-id` / `request-id` renvoyé
 
 ## Notes / décisions

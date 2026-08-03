@@ -2,12 +2,15 @@ import { Hono } from 'hono'
 import { getTokenMetadata } from '../auth/oauth-manager'
 import { logger } from '../middleware/request-logger'
 import { rateLimiter } from '../middleware/rate-limiter'
-import { requireApiKey, isApiKeyConfiguredAsync } from '../middleware/require-api-key'
+import { requireAdmin, isApiKeyConfiguredAsync } from '../middleware/require-api-key'
 import { getDeploymentHealth } from '../utils/deployment-check'
 
+// TL5 (0008): /full exposes token metadata + per-project usage + deployment
+// warnings. That is owner-only diagnostics — gate behind ADMIN_SECRET, not the
+// client key tier.
 export const statusRouter = new Hono()
 
-statusRouter.use('*', requireApiKey)
+statusRouter.use('*', requireAdmin)
 
 // GET /api/status/full — full diagnostics (no secrets)
 statusRouter.get('/full', async (c) => {
