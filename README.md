@@ -1,12 +1,22 @@
 # claude-proxy
 
-A proxy that lets you use your **Claude Pro/Max subscription** in Cursor IDE — no additional API costs.
+Use your **Claude Pro/Max subscription** as the model backend in Cursor IDE — no extra API bill.
+
+[![CI](https://github.com/elzinko/claude-proxy/actions/workflows/pr-tests.yml/badge.svg)](https://github.com/elzinko/claude-proxy/actions/workflows/pr-tests.yml)
+[![CodeQL](https://github.com/elzinko/claude-proxy/actions/workflows/codeql.yml/badge.svg)](https://github.com/elzinko/claude-proxy/actions/workflows/codeql.yml)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/elzinko/claude-proxy/badge)](https://scorecard.dev/viewer/?uri=github.com/elzinko/claude-proxy)
+[![Tests](https://img.shields.io/badge/tests-150%20passing-brightgreen)](.github/workflows/pr-tests.yml)
+[![Dependabot](https://img.shields.io/badge/Dependabot-enabled-025E8C?logo=dependabot&logoColor=white)](.github/dependabot.yml)
+[![Node](https://img.shields.io/badge/Node-%E2%89%A518-339933?logo=node.js&logoColor=white)](package.json)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)](tsconfig.json)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-%E2%98%95-FFDD00)](https://buymeacoffee.com/elzinko)
+
+Cursor speaks the OpenAI wire format; Anthropic does not, and Cursor has no field for a Claude subscription. This proxy sits between them: it accepts Cursor's OpenAI-compatible requests, authenticates to your Claude account over OAuth, and forwards to Anthropic. Your subscription pays for the tokens — no separate Anthropic API key.
 
 ```
 Cursor IDE → Proxy (Vercel) → Anthropic API (your Claude subscription)
 ```
-
-Cursor sends OpenAI-compatible requests to the proxy. The proxy authenticates with your Claude account via OAuth and forwards requests to Anthropic's API.
 
 > ⚠️ **Cursor blocks connections to private/local IPs.** The proxy **must** be deployed on a public server (Vercel recommended). Running it on `localhost` will not work with Cursor.
 
@@ -18,10 +28,11 @@ Cursor sends OpenAI-compatible requests to the proxy. The proxy authenticates wi
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/elzinko/claude-proxy&env=API_KEY&envDescription=Secret%20key%20to%20protect%20your%20proxy&integration-ids=oac_V3R1GIpkoJorr6fqyiwdhl17)
 
-- Set `API_KEY` to any secret string you choose (e.g. `my-secret-key-123`)
-- Add **Upstash Redis** from Vercel Marketplace (required for token storage)
+- Set `API_KEY` to a secret string of your own (e.g. `openssl rand -hex 32`) — clients present it to reach the proxy.
+- Set `ADMIN_SECRET` to a **different** secret — it gates the owner-only key-admin plane (see [Per-app keys](#per-app-keys)). Leave it unset and those routes stay fail-closed.
+- Add **Upstash Redis** from the Vercel Marketplace (required — stores OAuth tokens and the key registry).
 
-→ See **[Deployment Guide](docs/DEPLOYMENT.md)** for step-by-step instructions.
+→ See the **[Deployment Guide](docs/DEPLOYMENT.md)** for step-by-step instructions and the full env-var table.
 
 ### 2. Authenticate with Claude
 
@@ -29,18 +40,46 @@ Open your Vercel URL in a browser and click **"Connect with Claude"**. Sign in w
 
 ### 3. Configure Cursor
 
-→ See **[Cursor Setup Guide](docs/SETUP.md)** for exact steps and model names.
+→ See the **[Cursor Setup Guide](docs/SETUP.md)** for the base URL and the custom model names.
 
 ---
 
-## Modes
+## Per-app keys
 
-| Mode | When to use | Token storage |
-|------|-------------|---------------|
-| **Vercel** ✅ | Recommended — works with Cursor | Redis (Upstash) |
-| **Local / VPS** | Only if you have a public HTTPS URL | File or Redis |
+Beyond the single env `API_KEY`, the owner can mint a distinct key per project so any one can be revoked without rotating the rest. Minting lives behind `ADMIN_SECRET`, never a client key.
 
-> Local mode (`localhost`) **cannot** work with Cursor. Cursor routes all requests through its own cloud servers, which block private IP addresses.
+```bash
+# Mint a key — the plaintext is returned ONCE and never stored in the clear.
+curl -X POST "$PROXY_URL/api/keys" \
+     -H "Authorization: Bearer $ADMIN_SECRET" \
+     -d '{"label":"my-app"}'
+# → { "key": "cxk_<keyId>_<secret>", "keyId": "<keyId>", "label": "my-app", ... }
+
+# List keys (metadata only — never the secret).
+curl "$PROXY_URL/api/keys" -H "Authorization: Bearer $ADMIN_SECRET"
+
+# Revoke by key-id (idempotent). The secret is not needed to revoke.
+curl -X POST "$PROXY_URL/api/keys/<keyId>/revoke" \
+     -H "Authorization: Bearer $ADMIN_SECRET"
+```
+
+Clients send the minted key as `Authorization: Bearer cxk_<keyId>_<secret>`. The legacy env `API_KEY` keeps working alongside the registry, so nothing breaks if you never mint one.
+
+---
+
+## Security
+
+- **OAuth 2.0 + PKCE** — you log in with your Claude account; no password is ever stored.
+- **`API_KEY` + a distinct `ADMIN_SECRET`** — client keys and the owner admin plane are separate secrets. Minting/revoking keys is never reachable with a client key.
+- **Fail-closed** — with no auth source configured (no `API_KEY` and no key registry) the proxy refuses every request rather than opening up; the admin plane denies when `ADMIN_SECRET` is unset.
+- **Per-app key-id revocation** — kill one project's access by key-id without touching the others; secrets are stored only as `sha256` hashes and compared in constant time.
+- **Supply chain** — Dependabot ([config](.github/dependabot.yml)), [CodeQL](.github/workflows/codeql.yml) static analysis, and an [OpenSSF Scorecard](https://scorecard.dev/viewer/?uri=github.com/elzinko/claude-proxy).
+- **Tokens in Redis** — OAuth tokens live in Upstash Redis (Vercel) or a local file (local mode), not in the repo.
+- **Client monitoring** — an optional `/api/clients` dashboard shows one row per client (keyed by `sha256(api_key + ip)`) so you can spot unauthorized key use; set `IPINFO_TOKEN` to resolve each IP to its host/ASN.
+
+## Tests & coverage
+
+`npm test` runs **150 passing** unit + integration tests (typechecked in CI, job *Unit tests + typecheck*). `npm run coverage` reports **~32% v8 line coverage** — an honest undercount: it measures only the unit + integration suites, so the server and route entry points (`src/server.ts`, `src/routes/**`), which are exercised by the integration-shell suite (`tests/integration-tests.sh`) and the live two-call cache regressions (`tests/live/**`), do not register in that number.
 
 ---
 
@@ -104,25 +143,10 @@ Replaying the same curl 200 ms later should flip `cache_creation` to 0 and `cach
 
 ---
 
-## Security
+## ☕ Support
 
-- OAuth 2.0 with PKCE — no password stored
-- `API_KEY` required on public deployments
-- Tokens stored in Redis (Vercel) or local file (local mode)
-
-### Clients dashboard (`/api/clients`)
-
-The dashboard surfaces one row per `sha256(api_key + ip)` so you can spot
-unauthorized use of your key. To make this easier, the **Host / ASN** column
-resolves each IP to its provider — e.g. `AWS eu-west-3`, `Azure`,
-`SFR (FR, residential)` — so you can tell a home ISP apart from a cloud runner
-at a glance.
-
-Set `IPINFO_TOKEN` (free tier at [ipinfo.io](https://ipinfo.io), 50k
-lookups/month) in your Vercel env to enable. Lookups are cached in Upstash for
-30 days, so a busy proxy still does ~1 API call per unique client IP per
-month. Without the token the feature degrades gracefully (column stays empty).
+If this saved you an API bill, you can [buy me a coffee](https://buymeacoffee.com/elzinko).
 
 ## License
 
-MIT — Not affiliated with Anthropic or Cursor.
+MIT — see [LICENSE](LICENSE). Not affiliated with Anthropic or Cursor.
