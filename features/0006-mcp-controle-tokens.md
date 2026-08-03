@@ -58,6 +58,27 @@ sans élicitation) :
 - Le LLM ne voit qu'une chaîne ; il ne peut ni voir, ni forger, ni rejouer la
   confirmation. Même désactiver la garde est gaté.
 
+### d) Auth forte = WebAuthn / passkeys (recommandé, 2026-08-03)
+
+Concrétise l'« empreinte pour valider une action » : au lieu du Touch ID
+**macOS-only** + MCP local de google-mcp, utiliser **WebAuthn / passkeys** (standard
+FIDO2) sur la **page d'admin** :
+
+- Tu enregistres **une passkey une fois** (Touch ID / Face ID / clé physique) ; la clé
+  privée vit dans le Secure Enclave, **non-exportable** → satisfait **MF7**.
+- Chaque **mint/revoke** exige une **assertion WebAuthn** (geste biométrique) que le
+  serveur vérifie. **Anti-phishing** ; le LLM **ne peut pas** la produire (présence
+  utilisateur matérielle).
+- **Cross-device** (dans le navigateur, pas juste sur ton Mac) — bien mieux adapté à un
+  proxy hébergé sur Vercel que le Touch ID local. Challenge stocké en Redis (comme le
+  `state` OAuth de #17). Lib : `@simplewebauthn/server`.
+
+**Implication à confirmer (PO)** : pour le cas courant « **je** démarre un projet et je
+mint un token », **page d'admin + passkey suffit** → le **MCP devient optionnel** (utile
+seulement si un *agent autonome* doit **demander** un mint : MCP = « propose », toi =
+« approve » via passkey). Ça **simplifie la V1** : `ADMIN_SECRET` (fait, #17) + **passkey**
+sur les actions destructrices + registre de clés ; MCP en durcissement/plus tard.
+
 ## Critères d'acceptation
 
 - [ ] `token_mint` crée une clé par appli et renvoie la procédure d'intégration prête à coller
