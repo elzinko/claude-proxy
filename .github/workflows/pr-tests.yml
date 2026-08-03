@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: '20'
@@ -56,7 +56,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout deployed commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # Pin to the exact commit Vercel deployed, not the branch tip
           # (branch may have moved while the preview was building).
@@ -120,7 +120,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout deployed commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.deployment.sha }}
 
