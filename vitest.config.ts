@@ -22,5 +22,14 @@ export default defineConfig({
       ? ['tests/live/**/*.test.ts']
       : ['tests/unit/**/*.test.ts', 'tests/integration/**/*.test.ts'],
     testTimeout: LIVE ? 60_000 : 5000,
+    // Line coverage over the source tree. Reported via `npm run coverage`.
+    // Note: `npm test` runs unit + integration only, so server/route entry
+    // points that are exercised by the integration-shell and live suites do
+    // not show up in this v8 number — it under-counts real coverage.
+    coverage: {
+      provider: 'v8',
+      include: ['src/**'],
+      reporter: ['text', 'text-summary'],
+    },
   },
 })
