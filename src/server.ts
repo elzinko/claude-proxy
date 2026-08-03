@@ -225,6 +225,8 @@ app.post('/auth/login/start', requireAdmin, async (c: Context) => {
   }
 })
 
+// 0008 TL1: logout behind the distinct ADMIN_SECRET (supersedes #14's
+// client-API-key check — any client key holder could still wipe the token).
 app.post('/auth/logout', requireAdmin, async (c: Context) => {
   try {
     await oauthLogout()
