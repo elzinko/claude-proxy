@@ -486,6 +486,26 @@ function mapModelName(model: string): string {
   return model
 }
 
+// TL8 (0008): forward ONLY an allowlist of upstream response headers to the
+// downstream client. Anthropic's response carries account-correlatable identity
+// headers — `anthropic-organization-id`, `request-id`, `anthropic-ratelimit-*`,
+// `cf-ray`, `set-cookie`, … — and a holder of a downstream key must not be able
+// to tie responses back to the underlying subscription (surface-B identity
+// leak). Everything a client legitimately needs is either in the response body
+// or set explicitly by the proxy via `c.header()`; the only upstream header we
+// pass through is `content-type` (it distinguishes text/event-stream from
+// application/json for the streaming path). This REPLACES the previous denylist
+// (which forwarded everything except a couple of hop-by-hop headers).
+export const FORWARDED_UPSTREAM_HEADERS = new Set(['content-type'])
+
+export function forwardSafeResponseHeaders(c: Context, response: Response): void {
+  response.headers.forEach((value, key) => {
+    if (FORWARDED_UPSTREAM_HEADERS.has(key.toLowerCase())) {
+      c.header(key, value)
+    }
+  })
+}
+
 const messagesFn = async (c: Context) => {
   const startTime = Date.now()
   const body: AnthropicRequestBody = await c.req.json()
@@ -917,15 +937,7 @@ const messagesFn = async (c: Context) => {
         blocked: false,
       })
 
-      response.headers.forEach((value, key) => {
-        if (
-          key.toLowerCase() !== 'content-encoding' &&
-          key.toLowerCase() !== 'content-length' &&
-          key.toLowerCase() !== 'transfer-encoding'
-        ) {
-          c.header(key, value)
-        }
-      })
+      forwardSafeResponseHeaders(c, response)
 
       const reader = response.body!.getReader()
       const decoder = new TextDecoder()
@@ -1016,20 +1028,12 @@ const messagesFn = async (c: Context) => {
       if (transformToOpenAIFormat) {
         const openAIResponse = convertNonStreamingResponse(responseData)
 
-        response.headers.forEach((value, key) => {
-          if (key.toLowerCase() !== 'content-encoding') {
-            c.header(key, value)
-          }
-        })
+        forwardSafeResponseHeaders(c, response)
 
         return c.json(openAIResponse)
       }
 
-      response.headers.forEach((value, key) => {
-        if (key.toLowerCase() !== 'content-encoding') {
-          c.header(key, value)
-        }
-      })
+      forwardSafeResponseHeaders(c, response)
 
       return c.json(responseData)
     }

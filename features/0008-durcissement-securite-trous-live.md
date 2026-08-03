@@ -22,7 +22,9 @@ created: 2026-08-01
 
 **TL5 livré** (registre 0006 en #20 pour les **mutations** revoke/unrevoke ; **lectures** `/api/clients`, `/api/clients/daily`, `/api/stats/*`, `/api/status/full` passées **tier admin** + `/auth/status` info-leak réduit à `{authenticated, apiKeyConfigured}` hors admin → PR 0008-info-leak-tier). Dashboard non cassé (le champ était déjà le secret admin). **+6 tests (158).**
 
-**Restants :** **TL6** (rate-limiter Redis par key-id — dépend d'un choix de politique de quotas), **TL7** (amplification IPINFO via XFF spoofé — skip pour bloqués/révoqués + cap par key-id), **TL8** (allowlist des headers de réponse — anti-fuite `anthropic-organization-id`/`request-id`) → follow-up.
+**TL8 livré** (allowlist des headers de réponse : seul `content-type` est transmis en aval ; `anthropic-organization-id`, `request-id`, `anthropic-ratelimit-*`, `cf-ray`, `set-cookie`… sont **droppés** → PR 0008-response-header-allowlist). Corrige au passage un `content-length` amont périmé transmis par le chemin transform OpenAI. **+2 tests (160).**
+
+**Restants :** **TL6** (rate-limiter Redis par key-id — dépend d'un choix de politique de quotas), **TL7** (amplification IPINFO via XFF spoofé — skip pour bloqués/révoqués + cap par key-id) → follow-up. Décision produit en attente : quotas TL6 (proxy mono-utilisateur → rate-limiting surtout anti-emballement).
 
 ## Trous confirmés
 
@@ -53,7 +55,7 @@ created: 2026-08-01
 - [ ] Erreur Redis simulée → révocation **deny** (fail-closed)
 - [ ] Deux refresh concurrents → **un seul** grant effectif (lock), pas de panne
 - [x] Clé client → **401** sur `/api/clients`, `/api/stats`, `/api/status/full` (tier admin) + `/auth/status` sans admin ne renvoie que `{authenticated, apiKeyConfigured}`
-- [ ] Réponse surface B → **aucun** `anthropic-organization-id` / `request-id` renvoyé
+- [x] Réponse surface B → **aucun** `anthropic-organization-id` / `request-id` renvoyé (allowlist `content-type` uniquement)
 
 ## Notes / décisions
 
