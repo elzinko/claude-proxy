@@ -27,7 +27,7 @@ function generatePKCE(): PKCE {
   return { verifier, challenge }
 }
 
-export function getAuthorizationUrl(pkce: PKCE): string {
+export function getAuthorizationUrl(pkce: PKCE, state: string): string {
   const authUrl = new URL('https://claude.ai/oauth/authorize')
   authUrl.searchParams.set('code', 'true')
   authUrl.searchParams.set('client_id', CLIENT_ID)
@@ -39,14 +39,14 @@ export function getAuthorizationUrl(pkce: PKCE): string {
   )
   authUrl.searchParams.set('code_challenge', pkce.challenge)
   authUrl.searchParams.set('code_challenge_method', 'S256')
-  authUrl.searchParams.set('state', pkce.verifier)
+  authUrl.searchParams.set('state', state)
 
   return authUrl.toString()
 }
 
 async function startAuthFlow(): Promise<TokenResponse> {
   const pkce = generatePKCE()
-  const authUrl = getAuthorizationUrl(pkce)
+  const authUrl = getAuthorizationUrl(pkce, pkce.verifier)
 
   console.log('\n🔐 OAuth Authentication Required')
   console.log('Please visit the following URL to authenticate:')
@@ -129,23 +129,29 @@ export async function generateAuthSession(): Promise<{
   sessionId: string
 }> {
   const pkce = generatePKCE()
-  const authUrl = getAuthorizationUrl(pkce)
+  // 0008 TL1: server-issued random `state` (NOT the verifier). We store
+  // state → verifier server-side; the callback must present a state we issued,
+  // which is what makes a forged/unsolicited callback fail (CSRF protection).
+  const state = crypto.randomBytes(32).toString('base64url')
+  const authUrl = getAuthorizationUrl(pkce, state)
+  await authManager.setOAuthState(state, pkce.verifier)
 
-  // Store PKCE verifier temporarily (in production, use a proper session store)
-  // For now, we'll use the verifier as the session ID
-  const sessionId = pkce.verifier
-
-  return { authUrl, sessionId }
+  // `sessionId` (field kept for UI back-compat) is now the state, not the verifier.
+  return { authUrl, sessionId: state }
 }
 
 // New function to handle OAuth callback
 export async function handleOAuthCallback(
   code: string,
-  sessionId: string,
+  state: string,
 ): Promise<TokenResponse> {
-  // In production, retrieve the verifier from session store
-  // For now, we use the sessionId as the verifier
-  const verifier = sessionId
+  // 0008 TL1: resolve the verifier from the server-issued state (single-use).
+  // No matching state → reject. This blocks a forged/unsolicited callback from
+  // overwriting the stored upstream credential with attacker-controlled tokens.
+  const verifier = await authManager.takeOAuthState(state)
+  if (!verifier) {
+    throw new Error('Invalid or expired OAuth state')
+  }
 
   return await exchangeCodeForTokens(code, verifier)
 }
