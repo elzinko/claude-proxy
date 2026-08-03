@@ -658,6 +658,9 @@
       }
 
       async function startAuth() {
+        // /auth/oauth/start is admin-only: send the admin secret (API key field).
+        const key = document.getElementById('apiKeyInput').value.trim()
+        if (!key) { showAuthError('Enter the admin secret (API key field) to authenticate'); return }
         const btn = document.getElementById('startAuthBtn')
         const btnText = document.getElementById('btnText')
         btn.disabled = true
@@ -665,7 +668,11 @@
         hideAuthError()
 
         try {
-          const res = await fetch('/auth/oauth/start', { method: 'POST' })
+          const res = await fetch('/auth/oauth/start', {
+            method: 'POST',
+            headers: { Authorization: 'Bearer ' + key },
+          })
+          if (!res.ok) throw new Error(res.status === 401 ? 'Invalid admin secret' : 'Failed to start authentication')
           const data = await res.json()
           if (!data.authUrl) throw new Error('No auth URL received')
 
@@ -684,22 +691,25 @@
           btnText.innerHTML = '<i data-lucide="external-link" style="width:16px;height:16px;"></i> Waiting for authentication…'
           lucide.createIcons()
         } catch (err) {
-          showAuthError('Failed to start authentication')
+          showAuthError(err.message || 'Failed to start authentication')
           btn.disabled = false
           btnText.textContent = 'Connect with Claude'
         }
       }
 
       async function submitCode() {
+        // /auth/oauth/callback is admin-only: send the admin secret (API key field).
+        const key = document.getElementById('apiKeyInput').value.trim()
         const input = document.getElementById('authCode')
         const code = input.value.trim()
         if (!code) { showAuthError('Paste an OAuth code first'); return }
+        if (!key) { showAuthError('Enter the admin secret (API key field) to authenticate'); return }
 
         try {
           const body = { code, ...(currentSessionId && { sessionId: currentSessionId }) }
           const res = await fetch('/auth/oauth/callback', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + key },
             body: JSON.stringify(body),
           })
           const data = await res.json()

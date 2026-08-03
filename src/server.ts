@@ -126,8 +126,10 @@ app.route('/api/status', statusRouter)
 // Clients API — per-fingerprint list, daily usage, revoke/unrevoke (protected)
 app.route('/api/clients', clientsRouter)
 
-// New OAuth start endpoint for UI
-app.post('/auth/oauth/start', async (c: Context) => {
+// New OAuth start endpoint for UI — admin-only (same plane as logout/login-start):
+// leaving it open lets a third party run the flow with THEIR account and clobber
+// the proxy's Anthropic binding; it also exposes the PKCE verifier to the caller.
+app.post('/auth/oauth/start', requireAdmin, async (c: Context) => {
   try {
     const { authUrl, sessionId } = await generateAuthSession()
 
@@ -147,8 +149,9 @@ app.post('/auth/oauth/start', async (c: Context) => {
   }
 })
 
-// New OAuth callback endpoint for UI
-app.post('/auth/oauth/callback', async (c: Context) => {
+// New OAuth callback endpoint for UI — admin-only: it writes the OAuth token via
+// authManager.set(), so an unauthenticated caller could bind the proxy to their account.
+app.post('/auth/oauth/callback', requireAdmin, async (c: Context) => {
   try {
     const body = await c.req.json()
     const { code, sessionId } = body
