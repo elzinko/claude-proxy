@@ -5,7 +5,7 @@ Use your **Claude Pro/Max subscription** as the model backend in Cursor IDE — 
 [![CI](https://github.com/elzinko/claude-proxy/actions/workflows/pr-tests.yml/badge.svg)](https://github.com/elzinko/claude-proxy/actions/workflows/pr-tests.yml)
 [![CodeQL](https://github.com/elzinko/claude-proxy/actions/workflows/codeql.yml/badge.svg)](https://github.com/elzinko/claude-proxy/actions/workflows/codeql.yml)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/elzinko/claude-proxy/badge)](https://scorecard.dev/viewer/?uri=github.com/elzinko/claude-proxy)
-[![Tests](https://img.shields.io/badge/tests-150%20passing-brightgreen)](.github/workflows/pr-tests.yml)
+[![Tests](https://img.shields.io/badge/tests-151%20passing-brightgreen)](.github/workflows/pr-tests.yml)
 [![Dependabot](https://img.shields.io/badge/Dependabot-enabled-025E8C?logo=dependabot&logoColor=white)](.github/dependabot.yml)
 [![Node](https://img.shields.io/badge/Node-%E2%89%A518-339933?logo=node.js&logoColor=white)](package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)](tsconfig.json)
@@ -79,7 +79,7 @@ Clients send the minted key as `Authorization: Bearer cxk_<keyId>_<secret>`. The
 
 ## Tests & coverage
 
-`npm test` runs **150 passing** unit + integration tests (typechecked in CI, job *Unit tests + typecheck*). `npm run coverage` reports **~32% v8 line coverage** — an honest undercount: it measures only the unit + integration suites, so the server and route entry points (`src/server.ts`, `src/routes/**`), which are exercised by the integration-shell suite (`tests/integration-tests.sh`) and the live two-call cache regressions (`tests/live/**`), do not register in that number.
+`npm test` runs **151 passing** unit + integration tests (typechecked in CI, job *Unit tests + typecheck*). `npm run coverage` reports **~32% v8 line coverage** — an honest undercount: it measures only the unit + integration suites, so the server and route entry points (`src/server.ts`, `src/routes/**`), which are exercised by the integration-shell suite (`tests/integration-tests.sh`) and the live two-call cache regressions (`tests/live/**`), do not register in that number.
 
 ---
 
