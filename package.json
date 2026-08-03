@@ -1,5 +1,5 @@
 {
-  "name": "cursor-claude-connector",
+  "name": "claude-proxy",
   "version": "1.0.0",
   "description": "Connector proxy to use Cursor code editor with Claude (Pro/Max) subscription as API key for tokens",
   "main": "dist/server.js",
@@ -32,7 +32,7 @@
     "claude-max",
     "oauth"
   ],
-  "author": "Maol-1997",
+  "author": "elzinko",
   "license": "MIT",
   "dependencies": {
     "@hono/node-server": "^1.19.9",

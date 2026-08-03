@@ -10,7 +10,7 @@
 
 ## Step 1 — Fork or clone the repository
 
-Fork [elzinko/cursor-claude-connector](https://github.com/elzinko/cursor-claude-connector) to your GitHub account, or clone it and push to your own repo.
+Fork [elzinko/claude-proxy](https://github.com/elzinko/claude-proxy) to your GitHub account, or clone it and push to your own repo.
 
 ---
 
@@ -18,7 +18,7 @@ Fork [elzinko/cursor-claude-connector](https://github.com/elzinko/cursor-claude-
 
 ### Option A — One-click deploy (recommended)
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/elzinko/cursor-claude-connector&env=API_KEY&envDescription=Secret%20key%20to%20protect%20your%20proxy&integration-ids=oac_V3R1GIpkoJorr6fqyiwdhl17)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/elzinko/claude-proxy&env=API_KEY&envDescription=Secret%20key%20to%20protect%20your%20proxy&integration-ids=oac_V3R1GIpkoJorr6fqyiwdhl17)
 
 - Set `API_KEY` to any secret string you choose (min. 8 characters)
 - Vercel will clone the repo and deploy it
