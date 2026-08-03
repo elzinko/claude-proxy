@@ -86,6 +86,17 @@ describe('validateApiKey — fail-closed gate + legacy branch', () => {
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.status).toBe(401)
   })
+
+  it('401 body carries an actionable hint pointing to /api/keys (0002)', async () => {
+    process.env.API_KEY = 'k1'
+    const r = await validateApiKey(ctx('Bearer nope'))
+    expect(r.ok).toBe(false)
+    if (!r.ok) {
+      expect(r.status).toBe(401)
+      expect(typeof r.body.hint).toBe('string')
+      expect(String(r.body.hint)).toContain('/api/keys')
+    }
+  })
 })
 
 describe('validateApiKey — registry (cxk_) branch', () => {

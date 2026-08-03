@@ -57,13 +57,21 @@ export async function isApiKeyConfiguredAsync(): Promise<boolean> {
 type ValidateOk = { ok: true; key: string; keyId: string; label: string }
 type ValidateErr = { ok: false; status: 401 | 500; body: Record<string, unknown> }
 
+// 0002: an explicit, actionable 401 — any project that hits the proxy without a
+// valid key learns, from the response itself, how to get one. Naming the mint
+// endpoint is not a leak: it is admin-gated (ADMIN_SECRET), so a client can only
+// obtain a key from the proxy owner, never mint one itself.
 function unauthorized(): ValidateErr {
   return {
     ok: false,
     status: 401,
     body: {
       error: 'Authentication required',
-      message: 'Please provide a valid API key',
+      message: 'Missing or invalid credentials — send `Authorization: Bearer <key>`.',
+      hint:
+        'No key yet? Ask the proxy owner to mint you a per-app key: ' +
+        'POST /api/keys {"label":"<your-app>"} with `Authorization: Bearer <ADMIN_SECRET>` ' +
+        '(the key is shown once). A legacy env API_KEY also works. See the README.',
     },
   }
 }
@@ -90,6 +98,9 @@ export async function validateApiKey(c: Context): Promise<ValidateOk | ValidateE
       body: {
         error: 'Configuration error',
         message: 'server misconfigured: no API_KEY configured',
+        hint:
+          'Owner: set API_KEY in the environment, OR configure Upstash Redis and ' +
+          'mint a per-app key via POST /api/keys (Bearer ADMIN_SECRET). See the README.',
       },
     }
   }
