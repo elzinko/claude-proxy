@@ -1,4 +1,5 @@
 import { Redis } from '@upstash/redis'
+import { registry } from '../middleware/key-registry'
 
 export type Platform = 'vercel' | 'local'
 export type StorageMode = 'file' | 'redis'
@@ -94,11 +95,20 @@ export async function checkRedisHealth(): Promise<RedisHealth> {
   }
 }
 
-export function getDeploymentWarnings(): DeploymentWarning[] {
+// `registryConfigured` reflects whether the per-app key registry actually holds
+// at least one minted key (0006). It's an argument, not a bare `hasRedis`
+// probe: Redis being present does NOT mean any key exists, and an empty
+// registry cannot authenticate anyone. Callers with an async context
+// (getDeploymentHealth) pass the real value; sync callers default to false.
+export function getDeploymentWarnings(
+  registryConfigured = false,
+): DeploymentWarning[] {
   const warnings: DeploymentWarning[] = []
   const info = getDeploymentInfo()
   const env = getEnvFlags()
   const mode = getEffectiveStorageMode()
+  // "API key configured" now means an env API_KEY OR a minted registry key.
+  const apiKeyConfigured = env.apiKey || registryConfigured
 
   if (info.platform === 'vercel' && mode === 'file') {
     warnings.push({
@@ -110,12 +120,12 @@ export function getDeploymentWarnings(): DeploymentWarning[] {
     })
   }
 
-  if (info.platform === 'vercel' && !env.apiKey) {
+  if (info.platform === 'vercel' && !apiKeyConfigured) {
     warnings.push({
       severity: 'error',
       message: 'Running on Vercel without API_KEY — /v1/* endpoints return 500.',
       remediation:
-        'Set API_KEY in Vercel → Settings → Environment Variables (any secret string).',
+        'Set API_KEY in Vercel → Settings → Environment Variables (any secret string), or mint a per-app key via /api/keys.',
     })
   }
 
@@ -128,11 +138,11 @@ export function getDeploymentWarnings(): DeploymentWarning[] {
     })
   }
 
-  if (info.platform === 'local' && info.nodeEnv === 'production' && !env.apiKey) {
+  if (info.platform === 'local' && info.nodeEnv === 'production' && !apiKeyConfigured) {
     warnings.push({
       severity: 'error',
       message: 'NODE_ENV=production but API_KEY is not set.',
-      remediation: 'Set API_KEY before running in production.',
+      remediation: 'Set API_KEY before running in production, or mint a per-app key.',
     })
   }
 
@@ -147,15 +157,16 @@ export interface DeploymentHealth {
 }
 
 export async function getDeploymentHealth(): Promise<DeploymentHealth> {
-  const [info, env, redis] = [
+  const [info, env, redis, registryConfigured] = [
     getDeploymentInfo(),
     getEnvFlags(),
     await checkRedisHealth(),
+    await registry.hasAnyKey(),
   ]
   return {
     info,
     env,
     storage: { mode: getEffectiveStorageMode(), redis },
-    warnings: getDeploymentWarnings(),
+    warnings: getDeploymentWarnings(registryConfigured),
   }
 }

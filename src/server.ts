@@ -10,7 +10,12 @@ import { printStatusline } from './utils/statusline'
 import { statsRouter } from './routes/stats'
 import { statusRouter } from './routes/status'
 import { clientsRouter } from './routes/clients'
-import { isApiKeyConfigured, validateApiKey, requireAdmin } from './middleware/require-api-key'
+import { keysRouter } from './routes/keys'
+import {
+  isApiKeyConfiguredAsync,
+  validateApiKey,
+  requireAdmin,
+} from './middleware/require-api-key'
 import {
   tracker,
   fingerprint as computeFingerprint,
@@ -125,6 +130,9 @@ app.route('/api/status', statusRouter)
 
 // Clients API — per-fingerprint list, daily usage, revoke/unrevoke (protected)
 app.route('/api/clients', clientsRouter)
+
+// Keys API — per-app key registry: mint/list/revoke (ADMIN_SECRET only)
+app.route('/api/keys', keysRouter)
 
 // New OAuth start endpoint for UI — admin-only (same plane as logout/login-start):
 // leaving it open lets a third party run the flow with THEIR account and clobber
@@ -261,10 +269,13 @@ app.get('/auth/status', async (c: Context) => {
   }
 
   try {
-    const metadata = await getTokenMetadata()
+    const [metadata, apiKeyConfigured] = await Promise.all([
+      getTokenMetadata(),
+      isApiKeyConfiguredAsync(),
+    ])
     return c.json({
       ...metadata,
-      apiKeyConfigured: isApiKeyConfigured(),
+      apiKeyConfigured,
       deployment,
     })
   } catch (error) {
@@ -274,7 +285,7 @@ app.get('/auth/status', async (c: Context) => {
       expiresInSeconds: null,
       hasRefreshToken: false,
       storageMode: getEffectiveStorageMode(),
-      apiKeyConfigured: isApiKeyConfigured(),
+      apiKeyConfigured: await isApiKeyConfiguredAsync(),
       deployment,
     })
   }
@@ -473,12 +484,15 @@ const messagesFn = async (c: Context) => {
   console.log(`[PROXY] ${c.req.path} model=${body.model} stream=${isStreaming}`)
 
   // API Key validation — shared with /api/stats and /api/status/full
-  const keyResult = validateApiKey(c)
+  const keyResult = await validateApiKey(c)
   if (!keyResult.ok) {
     if (keyResult.status === 401) console.log('[PROXY] Rejected: invalid API key')
     return c.json(keyResult.body, keyResult.status)
   }
-  const apiKey = keyResult.key
+  // Dashboard/tracking identity: registry keys expose only the PUBLIC keyId, so
+  // no secret bytes ever reach fingerprints, masks, logs, or stored records.
+  // Legacy env keys keep the prior raw-key behavior (non-regression).
+  const apiKey = keyResult.keyId === 'env:legacy' ? keyResult.key : keyResult.keyId
   const project = extractProjectFromApiKey(apiKey)
 
   // Client fingerprint (api_key + IP) + revocation check
@@ -1037,12 +1051,14 @@ const responsesFn = async (c: Context) => {
   console.log(`[PROXY] /v1/responses model=${reqBody.model} stream=${isStreaming}`)
 
   // Auth
-  const keyResult = validateApiKey(c)
+  const keyResult = await validateApiKey(c)
   if (!keyResult.ok) {
     if (keyResult.status === 401) console.log('[PROXY] Rejected: invalid API key')
     return c.json(keyResult.body, keyResult.status)
   }
-  const apiKey = keyResult.key
+  // Public keyId for registry keys (no secret bytes on the dashboard); raw key
+  // for legacy env keys (non-regression). See messagesFn for rationale.
+  const apiKey = keyResult.keyId === 'env:legacy' ? keyResult.key : keyResult.keyId
   const project = extractProjectFromApiKey(apiKey)
 
   // Client fingerprint + revocation

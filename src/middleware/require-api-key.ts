@@ -1,8 +1,26 @@
-import { timingSafeEqual } from 'node:crypto'
+import { createHash, timingSafeEqual } from 'node:crypto'
 import type { Context, MiddlewareHandler } from 'hono'
+import { registry } from './key-registry'
 
 function getAllowedKeys(): string[] {
   return process.env.API_KEY?.split(',').map((k) => k.trim()).filter(Boolean) || []
+}
+
+function sha256Hex(s: string): string {
+  return createHash('sha256').update(s).digest('hex')
+}
+
+// Reserved prefix for per-app registry keys: `cxk_<keyId>_<secret>`. A legacy
+// env API_KEY that itself starts with this prefix would be routed to the
+// registry branch and could never authenticate as a legacy key — warn loudly
+// at module load so the operator renames it before it silently locks a client
+// out. (Fail-loud config guard, not a request-time check.)
+if (getAllowedKeys().some((k) => k.startsWith('cxk_'))) {
+  console.error(
+    '⚠️  SECURITY: an API_KEY entry begins with the reserved "cxk_" prefix — it ' +
+      'will be format-routed to the per-app key registry, never matched as a ' +
+      'legacy key. Rename that env key.',
+  )
 }
 
 function extractBearer(c: Context): string | undefined {
@@ -23,19 +41,49 @@ function safeEqual(a: string, b: string): boolean {
   return timingSafeEqual(ab, bb)
 }
 
+// Sync view: env API_KEY only. Kept for callers with no async context.
 export function isApiKeyConfigured(): boolean {
   return getAllowedKeys().length > 0
 }
 
-export function validateApiKey(c: Context): { ok: true; key: string } | { ok: false; status: 401 | 500; body: Record<string, unknown> } {
+// Authoritative view: configured if an env API_KEY is set OR the registry
+// actually holds at least one minted key (HLEN>0 — real keys, never bare
+// hasRedis). Async because the registry check may hit Redis.
+export async function isApiKeyConfiguredAsync(): Promise<boolean> {
+  if (getAllowedKeys().length > 0) return true
+  return registry.hasAnyKey()
+}
+
+type ValidateOk = { ok: true; key: string; keyId: string; label: string }
+type ValidateErr = { ok: false; status: 401 | 500; body: Record<string, unknown> }
+
+function unauthorized(): ValidateErr {
+  return {
+    ok: false,
+    status: 401,
+    body: {
+      error: 'Authentication required',
+      message: 'Please provide a valid API key',
+    },
+  }
+}
+
+// Format-routing (0006): a `cxk_`-prefixed bearer is a per-app registry key,
+// validated by key-id against the registry; anything else is a legacy env
+// API_KEY. The two never fall back onto each other — a bad registry key does
+// NOT get a second chance against the env key list.
+export async function validateApiKey(c: Context): Promise<ValidateOk | ValidateErr> {
   const allowedKeys = getAllowedKeys()
 
-  // TL2 (0008): fail CLOSED on EVERY platform when no key is configured.
-  // Previously this returned `ok: true` (open relay) outside Vercel/production,
-  // which turned any self-hosted / misconfigured deploy into an unauthenticated
-  // proxy in front of the paid Claude subscription. Never serve without a key.
-  if (allowedKeys.length === 0) {
-    console.error('⚠️  SECURITY: API_KEY is not configured — refusing all requests (fail-closed).')
+  // TL2 (0008) fail-closed gate, WIDENED for the registry (0006): only hard-500
+  // when there is NO possible authentication source at all — no env API_KEY AND
+  // no Redis behind the registry. With Redis present we can't cheaply know
+  // synchronously whether the registry holds keys, so we defer to the per-key
+  // check below rather than 500 a correctly-configured deploy.
+  if (allowedKeys.length === 0 && !registry.hasRedis) {
+    console.error(
+      '⚠️  SECURITY: no API_KEY configured and no key-registry backend — refusing all requests (fail-closed).',
+    )
     return {
       ok: false,
       status: 500,
@@ -47,26 +95,51 @@ export function validateApiKey(c: Context): { ok: true; key: string } | { ok: fa
   }
 
   const providedKey = extractBearer(c)
-  if (!providedKey || !allowedKeys.some((k) => safeEqual(k, providedKey))) {
-    return {
-      ok: false,
-      status: 401,
-      body: {
-        error: 'Authentication required',
-        message: 'Please provide a valid API key',
-      },
-    }
+  if (!providedKey) return unauthorized()
+
+  // ── Registry branch: cxk_<keyId>_<secret> ──────────────────────────────
+  if (providedKey.startsWith('cxk_')) {
+    const rest = providedKey.slice(4)
+    // NEVER split('_'): the base64url secret legitimately contains '_' and '-'.
+    // Split on the FIRST '_' only — everything after it is the secret.
+    const i = rest.indexOf('_')
+    if (i <= 0) return unauthorized()
+    const keyId = rest.slice(0, i)
+    const secret = rest.slice(i + 1)
+    if (!/^[0-9a-f]{12}$/.test(keyId) || !secret) return unauthorized()
+
+    const res = await registry.getKey(keyId)
+    if ('error' in res) return unauthorized() // fail-closed, NO legacy fallback
+    if (!res.found) return unauthorized()
+    const record = res.record
+    if (record.status !== 'active') return unauthorized() // revoked, IP-independent
+    if (!safeEqual(sha256Hex(secret), record.secretHash)) return unauthorized()
+
+    // Telemetry only — must not block or deny (do NOT await).
+    registry.touchLastUsed(keyId)
+    return { ok: true, key: providedKey, keyId, label: record.label }
   }
 
-  return { ok: true, key: providedKey }
+  // ── Legacy branch: env API_KEY (comma-separated) ───────────────────────
+  if (process.env.LEGACY_KEY_DISABLED === '1') return unauthorized()
+  if (allowedKeys.some((k) => safeEqual(k, providedKey))) {
+    return { ok: true, key: providedKey, keyId: 'env:legacy', label: 'env:legacy' }
+  }
+  return unauthorized()
 }
 
 export const requireApiKey: MiddlewareHandler = async (c, next) => {
-  const result = validateApiKey(c)
+  const result = await validateApiKey(c)
   if (!result.ok) {
     return c.json(result.body, result.status)
   }
-  c.set('apiKey', result.key)
+  // Store only the PUBLIC identity (keyId for registry keys) in context — never
+  // the raw secret-bearing `cxk_` key — so any future context reader / logging
+  // middleware cannot leak the secret. Legacy env keys keep their raw value
+  // (they are the operator's own secret; existing behaviour).
+  c.set('apiKey', result.keyId === 'env:legacy' ? result.key : result.keyId)
+  c.set('keyId', result.keyId)
+  c.set('keyLabel', result.label)
   await next()
 }
 
