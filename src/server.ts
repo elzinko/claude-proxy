@@ -556,18 +556,21 @@ const messagesFn = async (c: Context) => {
     )
   }
 
-  // Rate limiting check
-  const rateCheck = rateLimiter.check(project)
+  // Rate limiting — TL6 (0008): keyed by the stable per-app key-id (real
+  // isolation between apps) and shared across instances via Redis. `project`
+  // stays only as the human log label.
+  const rateCheck = await rateLimiter.check(keyResult.keyId)
   if (!rateCheck.allowed) {
     const resetIn = Math.ceil((rateCheck.resetAt - Date.now()) / 1000 / 60)
-    const rateStats = rateLimiter.getStats(project)
+    // No extra getStats round-trip here — a blocked (possibly hostile) request
+    // shouldn't cost a second Redis call just to log a count.
     console.log(
-      `[${project}] RATE LIMIT | ${rateStats.count}/${rateStats.limit} requests | Reset in ${resetIn}m`,
+      `[${project}] RATE LIMIT | key=${keyResult.label} | limit reached | Reset in ${resetIn}m`,
     )
     return c.json(
       {
         error: 'Rate limit exceeded',
-        message: `Too many requests for project "${project}". Try again in ${resetIn} minutes.`,
+        message: `Too many requests. Try again in ${resetIn} minutes.`,
         resetAt: new Date(rateCheck.resetAt).toISOString(),
       },
       429,
@@ -1092,8 +1095,8 @@ const responsesFn = async (c: Context) => {
     return c.json({ error: 'Client revoked', message: 'This client has been revoked.' }, 403)
   }
 
-  // Rate limiting
-  const rateCheck = rateLimiter.check(project)
+  // Rate limiting — keyed by the stable per-app key-id (TL6 0008).
+  const rateCheck = await rateLimiter.check(keyResult.keyId)
   if (!rateCheck.allowed) {
     const resetIn = Math.ceil((rateCheck.resetAt - Date.now()) / 1000 / 60)
     return c.json({ error: 'Rate limit exceeded', message: `Try again in ${resetIn} minutes.` }, 429)

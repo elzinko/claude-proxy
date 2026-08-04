@@ -1,9 +1,9 @@
 import { logger } from '../middleware/request-logger'
 import { rateLimiter } from '../middleware/rate-limiter'
 
-export function generateStatusline(project: string = 'default'): string {
+export async function generateStatusline(project: string = 'default'): Promise<string> {
   const stats = logger.getStats(project)
-  const rateStats = rateLimiter.getStats(project)
+  const rateStats = await rateLimiter.getStats(project)
 
   const bar = generateProgressBar(rateStats.count, rateStats.limit)
   const resetMin = Math.floor(rateStats.resetIn / 60)
@@ -22,8 +22,8 @@ function generateProgressBar(current: number, max: number, length: number = 10):
   return '▓'.repeat(filled) + '░'.repeat(empty)
 }
 
-export function printStatusline(project?: string) {
-  const line = generateStatusline(project)
+export async function printStatusline(project?: string) {
+  const line = await generateStatusline(project)
   // Move to bottom of terminal, clear line, print statusline
   process.stdout.write(`\x1b[999B\x1b[2K\r${line}\x1b[A`)
 }
