@@ -1,7 +1,6 @@
 import { Hono } from 'hono'
 import { getTokenMetadata } from '../auth/oauth-manager'
 import { logger } from '../middleware/request-logger'
-import { rateLimiter } from '../middleware/rate-limiter'
 import { requireAdmin, isApiKeyConfiguredAsync } from '../middleware/require-api-key'
 import { getDeploymentHealth } from '../utils/deployment-check'
 
@@ -36,7 +35,6 @@ statusRouter.get('/full', async (c) => {
       projects: stats.projects.map((proj) => ({
         name: proj,
         ...logger.getStats(proj),
-        rateLimit: rateLimiter.getStats(proj),
       })),
     },
   })

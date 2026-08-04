@@ -3,9 +3,9 @@ id: 0008
 title: Durcissement sécurité — trous live confirmés par la review adverse
 type: bug
 priority: P0
-status: todo
+status: shipped
 ready:
-pr:
+pr: "#17,#32,#33,#34,#35,+TL6"
 created: 2026-08-01
 ---
 
@@ -26,7 +26,9 @@ created: 2026-08-01
 
 **TL7 livré** : la moitié « valider l'IP réelle » (préférer `x-vercel-forwarded-for` non-spoofable au XFF) faite par **#34** (contournement de révocation par IP d'empreinte) ; la moitié « skip pour bloqués » faite ici (PR 0008-ipinfo-anti-amplification : `trackRequest` n'enrichit plus la provenance pour une requête bloquée → aucune requête hostile ne déclenche d'appel ipinfo). Le « cap par key-id » devient **redondant** : IP de confiance + cache par-IP (30 j) plafonnent déjà les appels à ~1 par IP réelle. **+2 tests (162).**
 
-**Restant : TL6 seulement** (rate-limiter **Redis** par key-id, remplace le limiteur en-mémoire par-lambda). **Bloqué sur une décision produit** : proxy mono-utilisateur → le rate-limiting est surtout un garde-fou anti-emballement ; quels quotas (ex. N req/h par appli) ou minimal/désactivable ?
+**TL6 livré** (PR 0008-rate-limiter-redis-keyid) : limiteur **Redis** à fenêtre fixe **par key-id** (isolation réelle entre apps — avant, tous les key-ids opaques sans `-` collapsaient sur `default`), partagé entre instances (avant : en-mémoire par-lambda → `100×instances`, reset au cold-start). **Fail-open** sur erreur Redis (un limiteur ≠ contrôle d'accès : ne pas s'auto-DoS ; la révocation, elle, reste fail-closed en amont). Quotas **inchangés par défaut** (`RATE_LIMIT_REQUESTS=100`/h, env-configurable) — pas de décision produit requise. **+4 tests (166).**
+
+> **0008 COMPLET.** TL1–TL8 tous livrés. Clés env-legacy multiples partagent le bucket `env:legacy` (legacy = break-glass mono-opérateur, impact faible).
 
 ## Trous confirmés
 

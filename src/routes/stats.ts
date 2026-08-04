@@ -1,6 +1,5 @@
 import { Hono } from 'hono'
 import { logger } from '../middleware/request-logger'
-import { rateLimiter } from '../middleware/rate-limiter'
 import { requireAdmin } from './../middleware/require-api-key'
 
 // TL5 (0008): usage stats and logs aggregate EVERY project's traffic, so they
@@ -20,7 +19,6 @@ statsRouter.get('/', (c) => {
     projects: stats.projects.map((proj) => ({
       name: proj,
       ...logger.getStats(proj),
-      rateLimit: rateLimiter.getStats(proj),
     })),
   })
 })
