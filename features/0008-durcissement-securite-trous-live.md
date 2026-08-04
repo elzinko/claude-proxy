@@ -24,7 +24,9 @@ created: 2026-08-01
 
 **TL8 livré** (allowlist des headers de réponse : seul `content-type` est transmis en aval ; `anthropic-organization-id`, `request-id`, `anthropic-ratelimit-*`, `cf-ray`, `set-cookie`… sont **droppés** → PR 0008-response-header-allowlist). Corrige au passage un `content-length` amont périmé transmis par le chemin transform OpenAI. **+2 tests (160).**
 
-**Restants :** **TL6** (rate-limiter Redis par key-id — dépend d'un choix de politique de quotas), **TL7** (amplification IPINFO via XFF spoofé — skip pour bloqués/révoqués + cap par key-id) → follow-up. Décision produit en attente : quotas TL6 (proxy mono-utilisateur → rate-limiting surtout anti-emballement).
+**TL7 livré** : la moitié « valider l'IP réelle » (préférer `x-vercel-forwarded-for` non-spoofable au XFF) faite par **#34** (contournement de révocation par IP d'empreinte) ; la moitié « skip pour bloqués » faite ici (PR 0008-ipinfo-anti-amplification : `trackRequest` n'enrichit plus la provenance pour une requête bloquée → aucune requête hostile ne déclenche d'appel ipinfo). Le « cap par key-id » devient **redondant** : IP de confiance + cache par-IP (30 j) plafonnent déjà les appels à ~1 par IP réelle. **+2 tests (162).**
+
+**Restant : TL6 seulement** (rate-limiter **Redis** par key-id, remplace le limiteur en-mémoire par-lambda). **Bloqué sur une décision produit** : proxy mono-utilisateur → le rate-limiting est surtout un garde-fou anti-emballement ; quels quotas (ex. N req/h par appli) ou minimal/désactivable ?
 
 ## Trous confirmés
 

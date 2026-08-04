@@ -221,14 +221,20 @@ async function trackRequest(input: TrackInput): Promise<void> {
   const tokInDelta = input.blocked ? 0 : input.tokensIn
   const tokOutDelta = input.blocked ? 0 : input.tokensOut
 
-  // Provenance enrichment — safe to call on every request (cache-backed,
-  // short timeout, never throws). If the lookup fails or is disabled, we
-  // get EMPTY_PROVENANCE and carry on.
+  // Provenance enrichment — ONLY for allowed requests. TL7 (0008): a blocked /
+  // revoked caller must never drive an ipinfo lookup (cost + Redis keyspace
+  // amplification). Since #34 the fingerprint IP is the platform-trusted header
+  // (not client-spoofable), so the per-IP cache already caps repeats for real
+  // traffic; skipping blocked requests closes the last path where hostile calls
+  // trigger an upstream enrichment. Existing provenance on the record is kept
+  // (we merge EMPTY_PROVENANCE, a no-op in applyProvenance).
   let provenance: ProvenanceData = EMPTY_PROVENANCE
-  try {
-    provenance = await lookupProvenance(input.ip, input.country)
-  } catch (err) {
-    console.error('[client-tracker] lookupProvenance failed:', err)
+  if (!input.blocked) {
+    try {
+      provenance = await lookupProvenance(input.ip, input.country)
+    } catch (err) {
+      console.error('[client-tracker] lookupProvenance failed:', err)
+    }
   }
 
   if (!redis) {
