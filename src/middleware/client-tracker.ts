@@ -89,12 +89,16 @@ export function parseUserAgent(ua: string): string {
 }
 
 export function getClientIp(c: Context): string {
-  const xff = c.req.header('x-forwarded-for')
-  if (xff) return xff.split(',')[0].trim()
-  const real = c.req.header('x-real-ip')
-  if (real) return real.trim()
+  // Prefer Vercel's platform-set header: it is NOT client-spoofable, unlike
+  // x-forwarded-for whose leftmost entry the client controls. Trusting XFF first
+  // let a revoked/rate-limited client change its fingerprint IP and slip the block.
   const vercelFwd = c.req.header('x-vercel-forwarded-for')
   if (vercelFwd) return vercelFwd.split(',')[0].trim()
+  const real = c.req.header('x-real-ip')
+  if (real) return real.trim()
+  // Last resort (non-Vercel/local): client-influenced, so lowest precedence.
+  const xff = c.req.header('x-forwarded-for')
+  if (xff) return xff.split(',')[0].trim()
   return 'unknown'
 }
 
