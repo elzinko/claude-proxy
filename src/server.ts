@@ -557,15 +557,16 @@ const messagesFn = async (c: Context) => {
   }
 
   // Rate limiting — TL6 (0008): keyed by the stable per-app key-id (real
-  // isolation between apps) and shared across instances via Redis. `project`
-  // stays only as the human log label.
+  // isolation between apps) and shared across instances via Redis.
   const rateCheck = await rateLimiter.check(keyResult.keyId)
   if (!rateCheck.allowed) {
     const resetIn = Math.ceil((rateCheck.resetAt - Date.now()) / 1000 / 60)
-    // No extra getStats round-trip here — a blocked (possibly hostile) request
-    // shouldn't cost a second Redis call just to log a count.
+    // Log the PUBLIC keyId (dashboard-visible id / 'env:legacy'), never
+    // `project` — for a legacy env key `project` is derived from the raw key and
+    // would clear-text-log key material (CodeQL). No extra getStats round-trip:
+    // a blocked (possibly hostile) request shouldn't cost a second Redis call.
     console.log(
-      `[${project}] RATE LIMIT | key=${keyResult.label} | limit reached | Reset in ${resetIn}m`,
+      `RATE LIMIT | key=${keyResult.keyId} | limit reached | Reset in ${resetIn}m`,
     )
     return c.json(
       {
