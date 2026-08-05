@@ -11,6 +11,7 @@ import { statsRouter } from './routes/stats'
 import { statusRouter } from './routes/status'
 import { clientsRouter } from './routes/clients'
 import { keysRouter } from './routes/keys'
+import { webauthnRouter } from './routes/webauthn'
 import {
   isApiKeyConfiguredAsync,
   validateApiKey,
@@ -134,6 +135,9 @@ app.route('/api/clients', clientsRouter)
 
 // Keys API — per-app key registry: mint/list/revoke (ADMIN_SECRET only)
 app.route('/api/keys', keysRouter)
+
+// Passkeys / WebAuthn enrollment (0009 Phase 1) — ADMIN_SECRET only
+app.route('/auth/webauthn', webauthnRouter)
 
 // New OAuth start endpoint for UI — admin-only (same plane as logout/login-start):
 // leaving it open lets a third party run the flow with THEIR account and clobber
