@@ -61,16 +61,18 @@ Navigateur (@simplewebauthn/browser)         Serveur (@simplewebauthn/server, Re
 
 ## Plan de livraison (incrémental)
 
-- **Phase 1 — Fondation d'enrôlement** *(model-agnostic, constructible tout de
-  suite)* : module `src/auth/webauthn.ts` (wrappers @simplewebauthn + stockage
-  Redis creds/challenges), routes `POST /auth/webauthn/register/options` +
-  `/register/verify` **derrière `ADMIN_SECRET`**, `GET`/`DELETE` credentials. Tests.
-- **Phase 2 — Cérémonie d'auth + enforcement** *(dépend de a/b)* :
-  `/auth/webauthn/auth/{options,verify}` → session admin courte signée ;
-  `requireAdmin` accepte session passkey **(a)** en plus / **(b)** à la place de
-  `ADMIN_SECRET`.
+- **Phase 1 — Fondation d'enrôlement** ✅ **livrée (#38)** : module
+  `src/auth/webauthn.ts` (wrappers @simplewebauthn + stockage Redis
+  creds/challenges), routes `register/{options,verify}` + `GET`/`DELETE`
+  credentials **derrière `ADMIN_SECRET`**. Tests.
+- **Phase 2 — Cérémonie d'auth + enforcement** ✅ **livrée — modèle (a)** :
+  `/auth/webauthn/auth/{options,verify}` **publics** (credentials découvrables →
+  pas d'énumération) ; un passkey vérifié **mint un token de session admin
+  HMAC** (`src/auth/admin-session.ts`, signé par `ADMIN_SECRET`, TTL 30 min) ;
+  `validateAdmin` accepte `ADMIN_SECRET` **ou** ce token (reste **sync**).
+  `ADMIN_SECRET` garde la main (base + secours) → **zéro lockout**.
 - **Phase 3 — UI landing** : bloc « Enrôler un passkey » + « Déverrouiller avec
-  passkey » via `@simplewebauthn/browser`.
+  passkey » via `@simplewebauthn/browser`. *(à faire)*
 
 ## Critères d'acceptation (phase 1)
 

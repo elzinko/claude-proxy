@@ -3,9 +3,12 @@ import { Redis } from '@upstash/redis'
 import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
+  generateAuthenticationOptions,
+  verifyAuthenticationResponse,
 } from '@simplewebauthn/server'
 import type {
   RegistrationResponseJSON,
+  AuthenticationResponseJSON,
   AuthenticatorTransportFuture,
 } from '@simplewebauthn/server'
 
@@ -23,6 +26,7 @@ const redis = hasRedis ? new Redis({ url: redisUrl!, token: redisToken! }) : nul
 
 const K_CREDS = 'webauthn:creds' // HASH: credentialId -> JSON(StoredCredential)
 const K_REG_CHALLENGE = 'webauthn:challenge:reg' // current registration challenge
+const K_AUTH_CHALLENGE = 'webauthn:challenge:auth' // current authentication challenge
 const CHALLENGE_TTL_S = 300 // 5 minutes
 
 // Single-owner proxy: one constant WebAuthn user identity.
@@ -46,14 +50,20 @@ export interface CredentialListItem {
 
 // ── In-memory fallback (local dev without Redis) ────────────────────────────
 const memCreds = new Map<string, StoredCredential>()
-let memChallenge: { challenge: string; exp: number } | null = null
+const memChallenges = new Map<string, { challenge: string; exp: number }>()
 
 // ── Uint8Array <-> base64 helpers (Redis stores JSON, not binary) ───────────
 function u8ToB64(u: Uint8Array): string {
   return Buffer.from(u).toString('base64')
 }
-export function b64ToU8(s: string): Uint8Array {
-  return new Uint8Array(Buffer.from(s, 'base64'))
+export function b64ToU8(s: string): Uint8Array<ArrayBuffer> {
+  // Construct over a FRESH ArrayBuffer (not the Buffer's possibly-shared pool)
+  // so the type is Uint8Array<ArrayBuffer>, as @simplewebauthn's credential type
+  // requires (TS 5.7+ made Uint8Array generic over its backing buffer).
+  const buf = Buffer.from(s, 'base64')
+  const out = new Uint8Array(buf.byteLength)
+  out.set(buf)
+  return out
 }
 
 function decode<T>(raw: unknown): T | null {
@@ -145,28 +155,28 @@ export async function deleteCredential(id: string): Promise<boolean> {
   }
 }
 
-// ── Challenge storage (single-owner → one pending registration challenge) ───
-async function putRegChallenge(challenge: string): Promise<void> {
+// ── Challenge storage (single-owner → one pending challenge per ceremony) ───
+async function putChallenge(key: string, challenge: string): Promise<void> {
   if (!redis) {
-    memChallenge = { challenge, exp: Date.now() + CHALLENGE_TTL_S * 1000 }
+    memChallenges.set(key, { challenge, exp: Date.now() + CHALLENGE_TTL_S * 1000 })
     return
   }
-  await redis.set(K_REG_CHALLENGE, challenge, { ex: CHALLENGE_TTL_S })
+  await redis.set(key, challenge, { ex: CHALLENGE_TTL_S })
 }
 
-async function takeRegChallenge(): Promise<string | null> {
+async function takeChallenge(key: string): Promise<string | null> {
   if (!redis) {
-    const cur = memChallenge
-    memChallenge = null
+    const cur = memChallenges.get(key)
+    memChallenges.delete(key) // single-use
     if (!cur || cur.exp < Date.now()) return null
     return cur.challenge
   }
   try {
     // GETDEL is atomic — no get-then-del race between concurrent verifies.
-    const val = await redis.getdel<string>(K_REG_CHALLENGE)
+    const val = await redis.getdel<string>(key)
     return val ?? null
   } catch (err) {
-    console.error('[webauthn] takeRegChallenge failed:', err)
+    console.error('[webauthn] takeChallenge failed:', err)
     return null
   }
 }
@@ -185,13 +195,16 @@ export async function startRegistration(c: Context) {
       transports: cred.transports as AuthenticatorTransportFuture[] | undefined,
     })),
     authenticatorSelection: {
-      residentKey: 'preferred',
+      // Discoverable (resident) credential → usernameless auth AND no need to
+      // enumerate credential IDs at auth time (the /auth/options endpoint is
+      // public, so listing allowCredentials there would leak them).
+      residentKey: 'required',
       // Require user verification (biometric / PIN) — this credential guards the
       // admin plane, and the whole point is "empreinte pour valider".
       userVerification: 'required',
     },
   })
-  await putRegChallenge(options.challenge)
+  await putChallenge(K_REG_CHALLENGE, options.challenge)
   return options
 }
 
@@ -200,7 +213,7 @@ export async function finishRegistration(
   response: RegistrationResponseJSON,
   label: string,
 ): Promise<{ verified: boolean; credentialId?: string; error?: string }> {
-  const expectedChallenge = await takeRegChallenge()
+  const expectedChallenge = await takeChallenge(K_REG_CHALLENGE)
   if (!expectedChallenge) {
     return { verified: false, error: 'No pending challenge (expired or unsolicited)' }
   }
@@ -236,11 +249,73 @@ export async function finishRegistration(
   return { verified: true, credentialId: stored.id }
 }
 
+// ── Authentication ceremony (0009 Phase 2) ──────────────────────────────────
+export async function startAuthentication(c: Context) {
+  const { rpID } = getRpConfig(c)
+  // No allowCredentials: rely on DISCOVERABLE credentials so this public
+  // endpoint never enumerates which passkeys exist. The authenticator offers the
+  // owner's resident credential for this RP-ID directly.
+  const options = await generateAuthenticationOptions({
+    rpID,
+    userVerification: 'required',
+  })
+  await putChallenge(K_AUTH_CHALLENGE, options.challenge)
+  return options
+}
+
+export async function finishAuthentication(
+  c: Context,
+  response: AuthenticationResponseJSON,
+): Promise<{ verified: boolean; credentialId?: string; error?: string }> {
+  const expectedChallenge = await takeChallenge(K_AUTH_CHALLENGE)
+  if (!expectedChallenge) {
+    return { verified: false, error: 'No pending challenge (expired or unsolicited)' }
+  }
+  const stored = await getCredential(response.id)
+  if (!stored) {
+    return { verified: false, error: 'Unknown credential' }
+  }
+  const { rpID, origin } = getRpConfig(c)
+
+  let verification
+  try {
+    verification = await verifyAuthenticationResponse({
+      response,
+      expectedChallenge,
+      expectedOrigin: origin,
+      expectedRPID: rpID,
+      credential: {
+        id: stored.id,
+        publicKey: b64ToU8(stored.publicKey),
+        counter: stored.counter,
+        transports: stored.transports as AuthenticatorTransportFuture[] | undefined,
+      },
+      requireUserVerification: true,
+    })
+  } catch (err) {
+    return { verified: false, error: (err as Error).message }
+  }
+
+  if (!verification.verified) {
+    return { verified: false, error: 'Assertion not verified' }
+  }
+
+  // Anti-replay: persist the authenticator's advancing signature counter (the
+  // lib rejects a counter regression for authenticators that maintain one).
+  const newCounter = verification.authenticationInfo.newCounter
+  if (newCounter > stored.counter) {
+    await putCredential({ ...stored, counter: newCounter })
+  }
+  return { verified: true, credentialId: stored.id }
+}
+
 export const webauthn = {
   hasRedis,
   getRpConfig,
   startRegistration,
   finishRegistration,
+  startAuthentication,
+  finishAuthentication,
   listCredentials,
   getCredential,
   deleteCredential,

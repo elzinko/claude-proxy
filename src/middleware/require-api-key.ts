@@ -1,6 +1,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
 import type { Context, MiddlewareHandler } from 'hono'
 import { registry } from './key-registry'
+import { verifyAdminSession } from '../auth/admin-session'
 
 function getAllowedKeys(): string[] {
   return process.env.API_KEY?.split(',').map((k) => k.trim()).filter(Boolean) || []
@@ -173,17 +174,20 @@ export function validateAdmin(c: Context): { ok: true } | { ok: false; status: 4
     }
   }
   const provided = extractBearer(c)
-  if (!provided || !safeEqual(secret, provided)) {
-    return {
-      ok: false,
-      status: 401,
-      body: {
-        error: 'Admin authentication required',
-        message: 'This operation requires the admin secret',
-      },
-    }
+  // Accept the ADMIN_SECRET OR a valid passkey admin-session token (0009 Phase 2,
+  // model a). The session is HMAC-signed by ADMIN_SECRET, so it is only valid
+  // while the secret is set/unrotated — the admin plane still has a single root.
+  if (provided && (safeEqual(secret, provided) || verifyAdminSession(provided))) {
+    return { ok: true }
   }
-  return { ok: true }
+  return {
+    ok: false,
+    status: 401,
+    body: {
+      error: 'Admin authentication required',
+      message: 'This operation requires the admin secret or a passkey session',
+    },
+  }
 }
 
 export const requireAdmin: MiddlewareHandler = async (c, next) => {
