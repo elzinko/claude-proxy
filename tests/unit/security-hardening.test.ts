@@ -5,6 +5,7 @@ import {
   validateApiKey,
 } from '../../src/middleware/require-api-key'
 import { registry } from '../../src/middleware/key-registry'
+import { mintAdminSession } from '../../src/auth/admin-session'
 
 // Minimal fake Hono Context: only `req.header('authorization')` is read.
 function ctx(authHeader?: string): Context {
@@ -200,6 +201,22 @@ describe('validateAdmin — TL1 admin plane, fail-closed', () => {
     process.env.API_KEY = 'client-key'
     process.env.ADMIN_SECRET = 'admin-key'
     const r = validateAdmin(ctx('Bearer client-key'))
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.status).toBe(401)
+  })
+
+  it('accepts a valid passkey admin-session token (0009 Phase 2, model a)', () => {
+    process.env.ADMIN_SECRET = 's3cr3t'
+    const session = mintAdminSession(60_000)!
+    const r = validateAdmin(ctx(`Bearer ${session.token}`))
+    expect(r.ok).toBe(true)
+  })
+
+  it('rejects a passkey session token once ADMIN_SECRET is rotated (401)', () => {
+    process.env.ADMIN_SECRET = 's3cr3t'
+    const session = mintAdminSession(60_000)!
+    process.env.ADMIN_SECRET = 'rotated'
+    const r = validateAdmin(ctx(`Bearer ${session.token}`))
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.status).toBe(401)
   })

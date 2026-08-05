@@ -93,3 +93,29 @@ describe('WebAuthn enrollment router — ceremony + reject paths', () => {
     expect(res.status).toBe(404)
   })
 })
+
+describe('WebAuthn auth ceremony (0009 Phase 2) — PUBLIC (you auth to GET admin)', () => {
+  it('POST /auth/options is reachable WITHOUT admin (200)', async () => {
+    // Public by necessity — returns request options (empty allowCredentials when
+    // nothing enrolled). A missing ADMIN_SECRET must not gate it.
+    const res = await makeApp().request('/auth/webauthn/auth/options', { method: 'POST' })
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { challenge?: string }
+    expect(typeof body.challenge).toBe('string')
+  })
+
+  it('POST /auth/verify with a bogus assertion → 401 (not verified)', async () => {
+    const res = await makeApp().request(
+      '/auth/webauthn/auth/verify',
+      postJson(null, { response: { id: 'nope', rawId: 'nope', type: 'public-key', response: {}, clientExtensionResults: {} } }),
+    )
+    expect(res.status).toBe(401)
+    const body = (await res.json()) as { verified: boolean }
+    expect(body.verified).toBe(false)
+  })
+
+  it('POST /auth/verify with no response body → 400', async () => {
+    const res = await makeApp().request('/auth/webauthn/auth/verify', postJson(null, {}))
+    expect(res.status).toBe(400)
+  })
+})
