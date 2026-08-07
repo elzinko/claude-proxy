@@ -4,9 +4,9 @@ title: Kill-switch / gardien authentifié pour révoquer tous les tokens
 type: feature
 priority: P1
 epic: 0005
-status: todo
+status: shipped
 ready:
-pr:
+pr: "#31"
 created: 2026-08-01
 ---
 

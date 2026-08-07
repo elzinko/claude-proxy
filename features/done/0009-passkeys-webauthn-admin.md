@@ -3,9 +3,9 @@ id: 0009
 title: Passkeys / WebAuthn pour le tier admin (auth forte à empreinte)
 type: feature
 priority: P1
-status: todo
+status: shipped
 ready:
-pr:
+pr: "#38,#39,#41"
 created: 2026-08-04
 ---
 

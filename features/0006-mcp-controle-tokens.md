@@ -4,9 +4,9 @@ title: MCP local de contrôle — mint/list/revoke des tokens par appli + élici
 type: feature
 priority: P1
 epic: 0005
-status: todo
+status: in-progress
 ready: 2026-08-03
-pr:
+pr: "#20 (V1)"
 created: 2026-08-01
 ---
 
