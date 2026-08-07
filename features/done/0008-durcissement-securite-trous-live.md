@@ -5,7 +5,7 @@ type: bug
 priority: P0
 status: shipped
 ready:
-pr: "#17,#32,#33,#34,#35,+TL6"
+pr: "#17,#32,#33,#34,#35,#36"
 created: 2026-08-01
 ---
 

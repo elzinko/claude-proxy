@@ -4,9 +4,9 @@ title: Réponse 401 explicite avec doc de génération de token
 type: feature
 priority: P2
 epic: 0005
-status: todo
+status: shipped
 ready: 2026-08-03
-pr:
+pr: "#21"
 created: 2026-08-01
 ---
 
