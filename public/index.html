@@ -6,6 +6,12 @@
     <title>Claude Proxy — Status & Auth</title>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+    <!-- Passkeys / WebAuthn browser helper (0009 Phase 3) — pinned + Subresource Integrity -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/@simplewebauthn/browser@13.3.0/dist/bundle/index.umd.min.js"
+      integrity="sha384-DnjEgzmDuatj/e2GTxbXmPijf7QyPvp8oAnvlWOqOqfMGekoIyImmgeJ+CxrALC7"
+      crossorigin="anonymous"
+    ></script>
     <style>
       :root {
         --background: 48 33.3333% 97.0588%;
@@ -510,6 +516,29 @@
           <label for="apiKeyInput">Admin secret</label>
           <input type="password" id="apiKeyInput" placeholder="ADMIN_SECRET (not a client key)" autocomplete="off" />
         </div>
+
+        <!-- Passkeys (0009 Phase 3): unlock admin with Touch ID instead of pasting the secret -->
+        <div id="passkeyBlock" style="margin: 0.25rem 0 0.75rem; padding: 0.75rem 0; border-top: 1px solid hsl(var(--border));">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:0.5rem; margin-bottom:0.5rem;">
+            <span style="font-size:0.8125rem; font-weight:500; display:inline-flex; align-items:center; gap:0.375rem;">
+              <i data-lucide="fingerprint"></i>Passkey (Touch ID / clé FIDO2)
+            </span>
+            <span id="passkeySessionBadge"></span>
+          </div>
+          <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+            <button class="button-secondary" style="flex:1;" onclick="unlockWithPasskey()">
+              <i data-lucide="unlock"></i>Déverrouiller avec passkey
+            </button>
+            <button class="button-secondary" style="flex:1;" onclick="enrollPasskey()">
+              <i data-lucide="plus"></i>Ajouter un passkey
+            </button>
+          </div>
+          <div id="passkeyList" style="margin-top:0.5rem; font-size:0.8125rem;"></div>
+          <div id="passkeyError" class="error-inline hidden">
+            <i data-lucide="alert-circle"></i><span id="passkeyErrorText"></span>
+          </div>
+        </div>
+
         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
           <button class="button-secondary" style="flex: 1;" onclick="loadFullStatus()">
             <i data-lucide="eye"></i>Fetch /api/status/full
@@ -648,13 +677,155 @@
           .replace(/"/g, '&quot;')
       }
 
+      // ── Passkeys (0009 Phase 3) ──────────────────────────────────────────
+      // A verified passkey mints a short-lived admin SESSION token that the
+      // server accepts alongside ADMIN_SECRET. We keep it in sessionStorage
+      // (gone when the tab closes) and every admin call prefers it over the
+      // typed secret — so once you unlock, you never paste the secret again.
+      const PK_SESSION_KEY = 'cxk_pk_session'
+
+      function passkeySession() {
+        try {
+          const raw = sessionStorage.getItem(PK_SESSION_KEY)
+          if (!raw) return null
+          const s = JSON.parse(raw)
+          if (!s.token || !s.expiresAt || new Date(s.expiresAt).getTime() <= Date.now()) {
+            sessionStorage.removeItem(PK_SESSION_KEY)
+            return null
+          }
+          return s
+        } catch { return null }
+      }
+
+      // The admin bearer for every privileged call: the passkey session if one
+      // is active, otherwise whatever is typed in the admin-secret field.
+      function adminToken() {
+        const s = passkeySession()
+        if (s) return s.token
+        const el = document.getElementById('apiKeyInput')
+        return el ? el.value.trim() : ''
+      }
+
+      function showPasskeyError(msg) {
+        const box = document.getElementById('passkeyError')
+        document.getElementById('passkeyErrorText').textContent = msg
+        box.classList.remove('hidden')
+      }
+      function hidePasskeyError() {
+        document.getElementById('passkeyError').classList.add('hidden')
+      }
+
+      function renderPasskeyBadge() {
+        const badge = document.getElementById('passkeySessionBadge')
+        if (!badge) return
+        badge.innerHTML = passkeySession()
+          ? '<span class="badge ok"><i data-lucide="unlock"></i>session passkey</span> <button class="button-secondary" style="padding:0 0.375rem;font-size:0.6875rem;" onclick="passkeyLogout()">verrouiller</button>'
+          : ''
+        lucide.createIcons()
+      }
+      function passkeyLogout() {
+        sessionStorage.removeItem(PK_SESSION_KEY)
+        renderPasskeyBadge()
+        refreshStatus()
+      }
+
+      function webauthnSupported() {
+        return !!window.SimpleWebAuthnBrowser && SimpleWebAuthnBrowser.browserSupportsWebAuthn()
+      }
+
+      // Public ceremony: authenticate with a passkey → obtain an admin session.
+      async function unlockWithPasskey() {
+        hidePasskeyError()
+        if (!webauthnSupported()) { showPasskeyError('Ce navigateur ne supporte pas les passkeys.'); return }
+        try {
+          const optRes = await fetch('/auth/webauthn/auth/options', { method: 'POST' })
+          const optionsJSON = await optRes.json()
+          if (!optRes.ok) throw new Error(optionsJSON.message || 'Échec des options')
+          const assertion = await SimpleWebAuthnBrowser.startAuthentication({ optionsJSON })
+          const verRes = await fetch('/auth/webauthn/auth/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ response: assertion }),
+          })
+          const data = await verRes.json()
+          if (!verRes.ok || !data.token) throw new Error(data.error || 'Passkey non vérifié')
+          sessionStorage.setItem(PK_SESSION_KEY, JSON.stringify({ token: data.token, expiresAt: data.expiresAt }))
+          renderPasskeyBadge()
+          await refreshStatus()
+          loadPasskeys()
+        } catch (err) {
+          showPasskeyError(err.name === 'NotAllowedError' ? 'Annulé, ou aucun passkey ne correspond.' : (err.message || 'Échec du déverrouillage'))
+        }
+      }
+
+      // Enrollment (needs admin: type the secret first, or unlock with an
+      // existing passkey). Registers this device's Touch ID / security key.
+      async function enrollPasskey() {
+        hidePasskeyError()
+        if (!webauthnSupported()) { showPasskeyError('Ce navigateur ne supporte pas les passkeys.'); return }
+        const tok = adminToken()
+        if (!tok) { showPasskeyError("Entre d'abord le secret admin (ou déverrouille avec un passkey existant)."); return }
+        try {
+          const optRes = await fetch('/auth/webauthn/register/options', {
+            method: 'POST', headers: { Authorization: 'Bearer ' + tok },
+          })
+          const optionsJSON = await optRes.json()
+          if (!optRes.ok) throw new Error(optRes.status === 401 ? 'Secret admin invalide' : (optionsJSON.message || 'Échec des options'))
+          const attestation = await SimpleWebAuthnBrowser.startRegistration({ optionsJSON })
+          const label = (prompt('Nom de ce passkey (ex. « MacBook Touch ID ») :', 'passkey') || 'passkey').slice(0, 60)
+          const verRes = await fetch('/auth/webauthn/register/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+            body: JSON.stringify({ response: attestation, label }),
+          })
+          const data = await verRes.json()
+          if (!verRes.ok || !data.verified) throw new Error(data.error || "Échec de l'enrôlement")
+          loadPasskeys()
+        } catch (err) {
+          showPasskeyError(err.name === 'NotAllowedError' ? 'Annulé.' : (err.message || "Échec de l'enrôlement"))
+        }
+      }
+
+      async function loadPasskeys() {
+        const list = document.getElementById('passkeyList')
+        const tok = adminToken()
+        if (!tok) { list.innerHTML = ''; return }
+        try {
+          const res = await fetch('/auth/webauthn/credentials', { headers: { Authorization: 'Bearer ' + tok } })
+          if (!res.ok) { list.innerHTML = ''; return }
+          const data = await res.json()
+          const creds = data.credentials || []
+          list.innerHTML = creds.length
+            ? creds.map((c) =>
+                `<div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;padding:0.25rem 0;">
+                   <span><i data-lucide="key-round" style="width:12px;height:12px;"></i> ${escapeHtml(c.label || 'passkey')} <span style="color:hsl(var(--muted-foreground));font-size:0.75rem;">${escapeHtml((c.created || '').slice(0, 10))}</span></span>
+                   <button class="button-secondary" style="padding:0.125rem 0.5rem;" onclick="deletePasskey('${escapeHtml(c.id)}')"><i data-lucide="trash-2" style="width:12px;height:12px;"></i></button>
+                 </div>`,
+              ).join('')
+            : '<span style="color:hsl(var(--muted-foreground));">Aucun passkey enrôlé.</span>'
+          lucide.createIcons()
+        } catch { list.innerHTML = '' }
+      }
+
+      async function deletePasskey(id) {
+        const tok = adminToken()
+        if (!tok) return
+        if (!confirm('Supprimer ce passkey ?')) return
+        try {
+          await fetch('/auth/webauthn/credentials/' + encodeURIComponent(id), {
+            method: 'DELETE', headers: { Authorization: 'Bearer ' + tok },
+          })
+          loadPasskeys()
+        } catch { showPasskeyError('Échec de la suppression') }
+      }
+
       async function refreshStatus() {
         try {
           // /auth/status returns a bare {authenticated, apiKeyConfigured} to the
           // public; the full detail (expiry, storage, region, warnings) is
           // owner-only. Send the admin secret when the field is filled so the
           // owner's dashboard shows the complete status.
-          const key = document.getElementById('apiKeyInput').value.trim()
+          const key = adminToken()
           const res = await fetch('/auth/status', {
             headers: key ? { Authorization: 'Bearer ' + key } : {},
           })
@@ -666,7 +837,7 @@
 
       async function startAuth() {
         // /auth/oauth/start is admin-only: send the admin secret (API key field).
-        const key = document.getElementById('apiKeyInput').value.trim()
+        const key = adminToken()
         if (!key) { showAuthError('Enter the admin secret (API key field) to authenticate'); return }
         const btn = document.getElementById('startAuthBtn')
         const btnText = document.getElementById('btnText')
@@ -706,7 +877,7 @@
 
       async function submitCode() {
         // /auth/oauth/callback is admin-only: send the admin secret (API key field).
-        const key = document.getElementById('apiKeyInput').value.trim()
+        const key = adminToken()
         const input = document.getElementById('authCode')
         const code = input.value.trim()
         if (!code) { showAuthError('Paste an OAuth code first'); return }
@@ -734,7 +905,7 @@
 
       async function logout() {
         // /auth/logout is now protected (it deletes the OAuth token): send the API key.
-        const key = document.getElementById('apiKeyInput').value.trim()
+        const key = adminToken()
         if (!key) {
           showAuthError('Enter your API key (field below) to sign out.')
           return
@@ -755,7 +926,7 @@
       }
 
       async function loadFullStatus() {
-        const key = document.getElementById('apiKeyInput').value.trim()
+        const key = adminToken()
         const out = document.getElementById('jsonOutput')
         const err = document.getElementById('jsonError')
         err.classList.add('hidden')
@@ -1005,7 +1176,7 @@
       }
 
       async function loadClients() {
-        const key = document.getElementById('apiKeyInput').value.trim()
+        const key = adminToken()
         const errBox = document.getElementById('clientsError')
         const errText = document.getElementById('clientsErrorText')
         errBox.classList.add('hidden')
@@ -1035,7 +1206,7 @@
       }
 
       async function revokeClient(fp) {
-        const key = document.getElementById('apiKeyInput').value.trim()
+        const key = adminToken()
         if (!key) return
         if (!confirm('Revoke client ' + fp.slice(0, 8) + '…?\nAll requests from this (api_key + IP) combo will be blocked immediately.')) return
         try {
@@ -1051,7 +1222,7 @@
       }
 
       async function unrevokeClient(fp) {
-        const key = document.getElementById('apiKeyInput').value.trim()
+        const key = adminToken()
         if (!key) return
         try {
           const res = await fetch('/api/clients/' + encodeURIComponent(fp) + '/unrevoke', {
@@ -1067,6 +1238,12 @@
 
       refreshStatus()
       setInterval(refreshStatus, 30000)
+
+      // Passkeys (0009 Phase 3): show any active session + list enrolled keys;
+      // re-list when the admin secret is typed (that enables enrollment).
+      renderPasskeyBadge()
+      loadPasskeys()
+      document.getElementById('apiKeyInput').addEventListener('input', () => loadPasskeys())
     </script>
   </body>
 </html>
