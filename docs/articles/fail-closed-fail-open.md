@@ -5,135 +5,114 @@
 
 # Le jour où Redis a hoqueté, et mes deux gardes ont réagi en sens inverse
 
-> La direction dans laquelle ton code échoue n'est pas un détail d'implémentation :
-> elle dépend de ce que tu protèges — un **accès** ou une **disponibilité**. Et le
-> bon réflexe est parfois exactement l'opposé de l'autre.
+> **La règle en une phrase.** La direction dans laquelle ton code échoue n'est pas
+> un détail : elle dépend de ce qu'il protège — le **droit d'entrer**, ou le fait
+> de **rester debout**. Et le bon réflexe est parfois l'exact opposé d'un cas à
+> l'autre.
 
-Un mardi soir, mon cache [Redis](https://redis.io/) a eu un hoquet. Rien de
-grave — un pic de latence chez mon hébergeur, quelques secondes où les requêtes
-vers la base ont expiré (*timeout*). Le genre d'incident qu'on ne remarque même
-pas.
+## D'abord, le produit (sinon l'histoire n'a pas de sens)
 
-Sauf que dans mon petit serveur, **deux gardes se sont réveillés au même instant
-et ont fait le contraire l'un de l'autre**. L'un a tout bloqué. L'autre a tout
-laissé passer. Et **les deux avaient raison**.
+J'ai bricolé un petit serveur, **claude-proxy**. Il se place entre mes projets
+perso — mon éditeur Cursor, mes petits scripts — et [Claude](https://claude.ai/)
+(l'assistant IA d'Anthropic) pour qu'ils utilisent **mon** abonnement sans que je
+recopie mes identifiants partout. Bref, un intermédiaire — un **portier**. *(Il tourne sur [Vercel](https://vercel.com/) et
+range ses infos dans [Redis](https://redis.io/), une petite mémoire ultra-rapide
+hébergée chez [Upstash](https://upstash.com/).)*
 
-## Le décor : un proxy et ses deux gardes
+Ce portier a **deux gardes** à l'entrée, et c'est toute l'histoire :
 
-J'ai monté un petit proxy : un intermédiaire qui reçoit les requêtes de mes
-projets perso et les relaie vers [Claude](https://claude.ai/) (l'assistant IA
-d'Anthropic) avec mon abonnement, pour ne pas recopier mes identifiants partout.
-Il tourne sur [Vercel](https://vercel.com/) (une plateforme d'hébergement
-d'applis web) en *serverless* — des fonctions qui s'allument à la demande — avec
-[Hono](https://hono.dev/) (un framework web léger) et [Upstash](https://upstash.com/)
-comme Redis. Dans cette base clé-valeur ultra-rapide, je garde — entre autres —
-les **deux** choses qui nous intéressent ici.
+- **Le contrôleur d'accès** — il vérifie que **ta clé** (l'identifiant que chaque
+  projet présente au portier) n'a pas été **révoquée** (coupée parce qu'elle a
+  fuité). Il décide **qui entre**.
+- **Le compteur** (le *rate-limiter*) — il plafonne le nombre de requêtes par appli,
+  pour qu'un projet emballé ne fasse pas exploser mon quota. Il décide **combien de
+  fois**.
 
-D'abord, la liste des clés **révoquées** : *révoquer*, c'est couper l'accès d'une
-clé compromise, immédiatement. Ensuite, des compteurs de **rate-limiting** : un
-plafond de requêtes par appli et par heure (100 chez moi), pour qu'un projet
-emballé ne fasse pas exploser mon quota.
+Retiens juste ça : un garde protège un **accès** (qui a le droit d'entrer),
+l'autre protège une **disponibilité** (que le service reste debout et joignable).
+On y revient — c'est le cœur de l'histoire.
 
-Deux gardes, donc. Le premier décide **qui a le droit d'entrer**. Le second
-décide **combien de fois**. Quand Redis les lâche tous les deux en même temps,
-chacun doit répondre à une question inconfortable : *« je n'arrive pas à
-vérifier — je fais quoi ? »*
+## Le mardi soir où tout a hoqueté
 
-## Garde n°1 : dans le doute, je claque la porte
+Un ralentissement — un « pic de latence » — chez mon hébergeur, et pendant quelques
+secondes mes deux gardes n'arrivent plus à joindre Redis, leur mémoire commune. Ni l'un ni l'autre ne peut
+faire son travail normalement.
 
-Vérifier si une clé est révoquée, ça veut dire interroger Redis avec son
-**empreinte** (un hash de la clé, jamais la clé en clair). Si Redis ne répond
-pas, je ne peux pas savoir. Voici, en simplifié, ce que fait mon code :
+Et là, surprise : **ils réagissent à l'opposé**. Le contrôleur d'accès **bloque
+tout**. Le compteur **laisse tout passer**. Le même incident, deux réflexes
+inverses — et, tu vas voir, **les deux ont raison**.
 
-```ts
-async function isRevoked(empreinte) {
-  try {
-    return (await redis.sismember(REVOQUEES, empreinte)) === 1
-  } catch (err) {
-    // On ne peut pas confirmer que cette clé n'est PAS révoquée → on refuse.
-    return true // fail closed : dans le doute, deny
-  }
-}
-```
+## Garde n°1 : dans le doute, il claque la porte
 
-C'est du **fail-closed** : quand le mécanisme lui-même tombe en panne, il se met
-en position *fermée*, il refuse. Le raisonnement tient en une phrase : si je suis
-incapable de garantir qu'une clé n'est **pas** révoquée, la laisser passer
-reviendrait à rouvrir la porte à une clé peut-être volée, précisément pendant la
-panne. Un attaquant qui verrait mon Redis vaciller n'aurait qu'à insister. Ici,
-la panne coûte de la disponibilité — mais elle ne **troue** jamais la sécurité.
+Le contrôleur d'accès n'arrive plus à vérifier si une clé est révoquée. Que
+fait-il ? Il **refuse**.
 
-## Garde n°2 : dans le doute, je laisse passer
+Le raisonnement est tout simple : s'il est **incapable de garantir** qu'une clé
+n'est pas révoquée, la laisser entrer reviendrait peut-être à rouvrir la porte à
+une clé volée — pile pendant la panne. Alors il se ferme. On appelle ça
+**fail-closed** : *quand le mécanisme lui-même casse, il se met en position
+fermée.* La panne coûte un peu de service, mais elle ne **troue** jamais la
+sécurité.
 
-Le rate-limiter, lui, incrémente un compteur dans Redis. Même panne, même
-question. Et pourtant :
+> 🔎 **Dans le code** — [`isRevoked`](https://github.com/elzinko/claude-proxy/blob/main/src/middleware/client-tracker.ts)
+> répond « révoqué » (donc : refusé) dès qu'elle n'arrive pas à interroger Redis.
 
-```ts
-async function check(identifier) {
-  const key = `ratelimit:${identifier}` // le compteur de cette appli
-  try {
-    const count = await redis.incr(key)
-    return { allowed: count <= 100 } // 100 = le plafond horaire
-  } catch (err) {
-    // Un rate-limiter protège la dispo, pas l'accès → on autorise.
-    return { allowed: true } // fail open : dans le doute, allow
-  }
-}
-```
+## Garde n°2 : dans le doute, il laisse passer
 
-Du **fail-open** : en panne, il se met en position *ouverte*, il laisse passer.
-Oui, pendant ces quelques secondes, je perds ma protection de quota — un projet
-emballé pourrait passer sous le radar. Mais le hoquet dure des **secondes** quand
-la fenêtre de comptage, elle, dure une **heure** : quelques requêtes non comptées
-ne coûtent rien. Refuser tout le trafic légitime, si.
+Le compteur, lui, n'arrive plus à ajouter +1 à son total. Même situation, mais il
+fait **l'inverse** : il **autorise**.
 
-Car si j'avais copié le réflexe du premier garde — « dans le doute, refuse » —
-j'aurais transformé un hoquet de quelques secondes de ma base en **panne totale
-de mon service**. Toutes les requêtes légitimes, refusées, parce qu'un compteur
-accessoire n'a pas pu s'incrémenter. Je me serais infligé une attaque par déni de
-service tout seul, sans attaquant.
+Pourquoi ? Parce qu'il ne protège pas la sécurité — il protège la
+**disponibilité**. S'il refusait tout le trafic juste parce qu'un compteur est en
+panne, il ferait tomber le service qu'il est censé garder debout : un
+**auto-sabotage**, une panne que je m'inflige tout seul, sans même un attaquant. On
+appelle ça **fail-open** : *quand le mécanisme casse, il se met en position
+ouverte.*
 
-## La règle que je me répète maintenant
+*(Oui, pendant ces quelques secondes, un projet emballé pourrait dépasser son
+quota. Mais la panne dure des secondes quand le quota, lui, se compte sur une
+heure : quelques requêtes non comptées, ce n'est rien. Bloquer tout le monde, si.)*
 
-Même exception (`catch`), même « Redis ne répond pas », et deux bonnes réponses
-**opposées**. La différence ne tient pas à la technique, mais à **ce que le code
-protège** :
+> 🔎 **Dans le code** — [`rate-limiter.ts`](https://github.com/elzinko/claude-proxy/blob/main/src/middleware/rate-limiter.ts) :
+> sur une erreur Redis, `check()` renvoie « autorisé ».
 
-| Le garde protège… | En panne, il doit… | Pourquoi |
+## La règle à retenir
+
+Le même incident — « Redis ne répond plus » — et pourtant **deux bonnes réponses
+opposées**. Ce qui change, ce n'est pas la technique : c'est **ce que chaque garde
+protège**.
+
+| Le garde protège… | En panne, il doit… | Sinon… |
 |---|---|---|
-| un **accès** (auth, révocation) | **fail-closed** — refuser | laisser passer troue la sécurité |
-| une **disponibilité** (rate-limit, quota) | **fail-open** — autoriser | refuser provoque la panne qu'on voulait éviter |
+| un **accès** (auth, révocation) | se **fermer** (*fail-closed*) | laisser entrer troue la sécurité |
+| une **disponibilité** (quota, débit) | s'**ouvrir** (*fail-open*) | tout refuser fait tomber le service |
 
-Le piège, c'est le dogme réconfortant « *fail-closed partout, c'est plus sûr* ».
-Sur une barrière d'accès, oui. Sur un garde-fou de disponibilité, c'est **te
-tirer une balle dans le pied** : tu transformes chaque micro-incident de ta
-dépendance en incident majeur de ton produit.
+Le piège, c'est le dogme rassurant « *fermer par défaut, c'est toujours plus
+sûr* ». Sur une porte d'entrée, oui. Sur un garde-fou de disponibilité, c'est **te
+tirer une balle dans le pied** : tu transformes le moindre hoquet de ta base en
+panne générale de ton produit.
 
 ## De retour au mardi soir
 
-Redis est revenu au bout de quelques secondes. Personne n'a rien vu. Pas parce
-que mes deux gardes ont fait la même chose — mais parce que **chacun a échoué
-dans sa propre bonne direction** : l'un fermé, l'autre ouvert.
+Redis est revenu au bout de quelques secondes. Personne n'a rien vu — non pas parce
+que mes deux gardes ont fait la même chose, mais parce que **chacun a échoué du bon
+côté** : l'un fermé, l'autre ouvert.
 
-Soyons honnêtes une seconde : ce soir-là, comme mes deux gardes partagent le même
-Redis, c'est surtout le garde d'**accès** (fail-closed) qui a parlé — il refusait
-déjà tout, brièvement. Le fail-open du rate-limiter, lui, montre vraiment sa
-valeur le jour où l'incident est *partiel* (le compteur lâche, mais pas l'auth)
-ou sous forte charge. Le principe, en revanche, ne bouge pas d'un pouce : chaque
-garde doit échouer dans **sa** bonne direction, indépendamment de ce que fait
-l'autre.
+*(En toute honnêteté : ce soir-là, comme mes deux gardes dépendent du même Redis,
+c'est surtout le contrôleur d'accès qui s'est fait entendre — il refusait déjà
+tout. Le compteur « fail-open » rend surtout service le jour où une **seule** des
+deux choses casse. Mais la règle, elle, ne bouge pas.)*
 
-Alors la prochaine fois que tu écris un `catch` autour d'un appel qui peut
-échouer, offre-toi la vraie question, toute bête : *est-ce que ce bout de code
-protège un **accès**, ou une **disponibilité** ?* La réponse te dit dans quel sens
-tomber. Et elle t'évite, un mardi soir, de te faire tomber toi-même.
+Alors la prochaine fois que tu écris un `catch` autour d'un truc qui peut casser,
+pose-toi la vraie question, toute bête : *est-ce que ce bout de code protège un
+**accès**, ou une **disponibilité** ?* La réponse te dit de quel côté tomber. Et
+elle t'évite, un mardi soir, de te faire tomber toi-même.
 
 ---
 
 *Pour creuser : ce réflexe est un cousin du
 [théorème CAP](https://fr.wikipedia.org/wiki/Th%C3%A9or%C3%A8me_CAP) (Cohérence,
 Disponibilité, tolérance au Partitionnement — en cas de coupure réseau, un système
-distribué doit choisir entre cohérence et disponibilité). La parenté : comme CAP
-arbitre cohérence vs disponibilité pour le système entier, ici chaque garde
-arbitre accès vs disponibilité — mais **garde par garde**, pas pour tout le
-système d'un coup.*
+distribué doit choisir entre cohérence et disponibilité) : comme CAP arbitre pour
+le système entier, ici chaque garde arbitre **accès vs disponibilité**, garde par
+garde. Le code est public : [github.com/elzinko/claude-proxy](https://github.com/elzinko/claude-proxy).*
