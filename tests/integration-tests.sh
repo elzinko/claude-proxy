@@ -29,7 +29,7 @@ if [[ -z "${API_KEY:-}" ]]; then
 fi
 
 # Défaut aligné sur docs/USER_GUIDE.md
-BASE_URL="${BASE_URL:-https://elzinko-cursor-claude-connector.vercel.app/v1}"
+BASE_URL="${BASE_URL:-https://elzinko-claude-proxy.vercel.app/v1}"
 BASE_URL="${BASE_URL%/}"
 # Racine du site (sans /v1) pour /auth/status
 ROOT_URL="${BASE_URL%/v1}"

@@ -1,7 +1,7 @@
 {
   "name": "claude-proxy",
-  "version": "1.0.0",
-  "description": "Connector proxy to use Cursor code editor with Claude (Pro/Max) subscription as API key for tokens",
+  "version": "1.1.0",
+  "description": "OpenAI-compatible proxy to use your Claude Pro/Max subscription as the model backend in Cursor IDE — no extra API bill",
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc",

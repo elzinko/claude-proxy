@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Cursor-Claude Connector - Proxy Integration Tests
+# claude-proxy - Proxy Integration Tests
 # =============================================================================
 # Starts the proxy server, runs tests against it, then shuts it down.
 #

@@ -18,7 +18,7 @@ created: 2026-08-01
 
 ## Statut (2026-08-02)
 
-**TL1–TL4 livrés → [PR #17](https://github.com/elzinko/cursor-claude-connector/pull/17)** (branche `feat/0008-security-hardening`, off `main`) : auth admin sur `/auth/logout` + `/auth/login/start`, CSRF du callback OAuth par `state` serveur à usage unique, fail-closed si `API_KEY` absent + compare constant-time, `isRevoked` fail-closed, lock single-flight du refresh. Typecheck + 126 tests verts (+9). ⚠️ nouvel env **`ADMIN_SECRET`** requis ; bouton « Disconnect » de l'UI à mettre à jour.
+**TL1–TL4 livrés → [PR #17](https://github.com/elzinko/claude-proxy/pull/17)** (branche `feat/0008-security-hardening`, off `main`) : auth admin sur `/auth/logout` + `/auth/login/start`, CSRF du callback OAuth par `state` serveur à usage unique, fail-closed si `API_KEY` absent + compare constant-time, `isRevoked` fail-closed, lock single-flight du refresh. Typecheck + 126 tests verts (+9). ⚠️ nouvel env **`ADMIN_SECRET`** requis ; bouton « Disconnect » de l'UI à mettre à jour.
 
 **TL5 livré** (registre 0006 en #20 pour les **mutations** revoke/unrevoke ; **lectures** `/api/clients`, `/api/clients/daily`, `/api/stats/*`, `/api/status/full` passées **tier admin** + `/auth/status` info-leak réduit à `{authenticated, apiKeyConfigured}` hors admin → PR 0008-info-leak-tier). Dashboard non cassé (le champ était déjà le secret admin). **+6 tests (158).**
 
