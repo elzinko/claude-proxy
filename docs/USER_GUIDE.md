@@ -1,4 +1,4 @@
-# User Guide — Appeler le proxy Cursor Claude Connector
+# User Guide — Appeler le proxy claude-proxy
 
 Guide pour utilisateurs et LLM : comment appeler ce proxy déployé sur Vercel.
 
@@ -7,7 +7,7 @@ Guide pour utilisateurs et LLM : comment appeler ce proxy déployé sur Vercel.
 ## Base URL
 
 ```
-https://elzinko-cursor-claude-connector.vercel.app/v1
+https://elzinko-claude-proxy.vercel.app/v1
 ```
 
 ---
@@ -28,7 +28,7 @@ Authorization: Bearer <API_KEY>
 
 Avant d’appeler l’API, le proxy doit être authentifié avec Claude via OAuth :
 
-1. Ouvre `https://elzinko-cursor-claude-connector.vercel.app/` dans un navigateur
+1. Ouvre `https://elzinko-claude-proxy.vercel.app/` dans un navigateur
 2. Clique sur **"Connect with Claude"**
 3. Connecte-toi avec ton compte Claude Pro/Max et autorise l’app
 4. Une fois terminé, le proxy peut transmettre les requêtes à Anthropic
@@ -42,7 +42,7 @@ Avant d’appeler l’API, le proxy doit être authentifié avec Claude via OAut
 Healthcheck à poller depuis EC2 ou un cron. Aucune clé requise, aucun champ sensible.
 
 ```bash
-curl https://elzinko-cursor-claude-connector.vercel.app/auth/status
+curl https://elzinko-claude-proxy.vercel.app/auth/status
 ```
 
 Réponse :
@@ -66,7 +66,7 @@ Inclut stats agrégées, rate-limit, env. Nécessite `Authorization: Bearer <API
 
 ```bash
 curl -H "Authorization: Bearer $API_KEY" \
-  https://elzinko-cursor-claude-connector.vercel.app/api/status/full
+  https://elzinko-claude-proxy.vercel.app/api/status/full
 ```
 
 ### `GET /api/stats` — protégé
@@ -129,7 +129,7 @@ Le proxy convertit les requêtes au format OpenAI vers l’API Anthropic. Champs
 ## Exemple : cURL
 
 ```bash
-curl -X POST "https://elzinko-cursor-claude-connector.vercel.app/v1/chat/completions" \
+curl -X POST "https://elzinko-claude-proxy.vercel.app/v1/chat/completions" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -145,7 +145,7 @@ curl -X POST "https://elzinko-cursor-claude-connector.vercel.app/v1/chat/complet
 ## Exemple : JavaScript / fetch
 
 ```javascript
-const response = await fetch('https://elzinko-cursor-claude-connector.vercel.app/v1/chat/completions', {
+const response = await fetch('https://elzinko-claude-proxy.vercel.app/v1/chat/completions', {
   method: 'POST',
   headers: {
     'Authorization': 'Bearer YOUR_API_KEY',
@@ -185,6 +185,6 @@ Mets `"stream": true` dans le corps de la requête. La réponse est en Server-Se
 Pour utiliser le proxy avec Cursor :
 
 1. **Settings → Models** (`Cmd+Shift+J` / `Ctrl+Shift+J`)
-2. Active **"Override OpenAI Base URL"** → `https://elzinko-cursor-claude-connector.vercel.app/v1`
+2. Active **"Override OpenAI Base URL"** → `https://elzinko-claude-proxy.vercel.app/v1`
 3. Active **"OpenAI API Key"** → colle ton `API_KEY`
 4. Ajoute un modèle personnalisé : `claude-proxy-sonnet-4.6` (ou un autre de la table ci-dessus)

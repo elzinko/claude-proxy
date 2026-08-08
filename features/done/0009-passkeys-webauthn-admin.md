@@ -43,7 +43,7 @@ attendre l'arbitrage.
   package) — pas de mur ESM/CJS comme TS 7 sur Vercel (vérifié : exports
   `generateRegistrationOptions` / `verifyRegistrationResponse` /
   `generateAuthenticationOptions` / `verifyAuthenticationResponse` présents).
-- **RP-ID = le domaine** (`elzinko-cursor-claude-connector.vercel.app` ; `localhost`
+- **RP-ID = le domaine** (`elzinko-claude-proxy.vercel.app` ; `localhost`
   en dev). Configurable via `WEBAUTHN_RP_ID` (repli sur le `Host` de la requête).
   ⚠️ si le domaine change, ré-enrôler (les credentials sont liés au RP-ID).
 - Stockage **Redis** (mono-utilisateur) : `webauthn:creds` (HASH credentialId →
