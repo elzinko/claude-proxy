@@ -140,6 +140,7 @@ Replaying the same curl 200 ms later should flip `cache_creation` to 0 and `cach
 - [Cursor Setup Guide](docs/SETUP.md) — Model names, Cursor configuration
 - [User Guide](docs/USER_GUIDE.md) — How to call the proxy (for users and LLMs)
 - [FAQ](docs/FAQ.md) — Common questions and issues
+- [Changelog](CHANGELOG.md) — Release history
 
 ---
 
