@@ -1,24 +1,43 @@
 # PLAN — claude-proxy
 
-> Séquence de build décidée (PO), 2026-08-03. Le gate `ready:` reste la porte
-> technique de tirage ; ce plan dit **l'ordre**. Décisions actées :
-> **élicitation signée dès la V1** · **surface B différée** (arbitrage A).
+> Séquence de build décidée (PO). Le gate `ready:` reste la porte technique de
+> tirage ; ce plan dit **l'ordre**. **Rafraîchi le 2026-08-07** après la session
+> sécu + passkeys. Décisions actées : élicitation signée = **durcissement V2**
+> (non bloquant) · surface B (0007) **différée** (arbitrage A).
+
+## ✅ Livré (rappel — détail dans `done/` + [BACKLOG.md](BACKLOG.md))
+
+Sécu **0008** complète (TL1-8) · **0004** révocation (key-id + globale + runbook) ·
+**0002** 401 explicite · **0006 V1** registre de clés par appli + plan admin ·
+**0009** passkeys / WebAuthn admin (Phases 1-3) · rename **claude-proxy** ·
+README + vignettes · deps (vitest 4 ; **TS 7 écarté** — casse le build Vercel).
+`ADMIN_SECRET` posé dans l'env Vercel.
 
 ## NOW
 
-1. **Merger les PRs ouvertes** — #17 (sécu urgente), #18 (rename), #16 (backlog + ADR) ; poser **`ADMIN_SECRET`** dans l'env Vercel.
-2. **0006** 🎯 — cœur V1 : registre de **clés par appli** (key-id, haché) + **plan admin** (secret admin) + **MCP local à élicitation signée**. Intègre MF1/MF5/MF6/MF7.
-3. **0004** — révocation **par key-id** / globale + runbook amont + **fix TL5** (mutations `/api/*` hors tier client). *Dépend de 0006.*
-4. **0002** 🎯 — réponse **401 explicite** avec procédure d'intégration affichée. *Indépendant.*
+- *(Rien de bloquant.)* Le cœur sécurité et le control plane admin **V1** sont
+  livrés et déployés.
 
-## NEXT
+## NEXT — optionnel, à tirer si le besoin se confirme
 
-- **0008** — finir **TL6–TL8** (rate-limiter Redis, IPINFO, allowlist headers) + `/auth/status`.
-- **README** — réécriture complète + vignettes (CI, coverage, Dependabot, CodeQL, OpenSSF, buymeacoffee). *(demande initiale, encore due)*
-- **0003** — swap auth `setup-token` (optionnel : l'OAuth + refresh actuel marche et est verrouillé depuis #17).
+- **0006 V2** — élicitation **signée** du control plane MCP (le secret « cher » :
+  broker signé hors canal LLM, façon `google-mcp-multi-account`). La **biométrie
+  admin est déjà couverte par 0009** ; il ne resterait que la signature hors-canal.
+  **Débattu** (jugé sur-dimensionné pour un proxy mono-utilisateur) → rouvrir
+  seulement si un vrai besoin émerge.
+- **0003** — swap auth `claude setup-token` + SDK. **Optionnel** : l'OAuth +
+  auto-refresh actuel marche et est verrouillé depuis #17.
 
 ## PARKÉ
 
-- **0007** — brique SDK (surface B) : **différée** (décision A). Rouvrir après résolution du marker « You are Claude Code » + risque CGU.
+- **0007** — brique SDK (surface B) : **différée** (décision A). Rouvrir après
+  résolution du marker « You are Claude Code » + risque CGU.
 
-> 🎯 = `ready:` posé (tirable). Ordre de tirage après merges : **0006 → 0004 → 0002**.
+## Épic ouvert
+
+- **0005** — gestion des tokens via MCP à élicitation forte : épic parent ; ses
+  enfants 0002/0004/0006-V1 sont livrés, le reliquat = l'élicitation signée V2
+  (cf. NEXT).
+
+> 📝 Article de blog « fail-closed vs fail-open » : brouillon en **PR #40 (draft)**,
+> attend relecture avant publication.
