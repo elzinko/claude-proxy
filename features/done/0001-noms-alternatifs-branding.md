@@ -3,9 +3,9 @@ id: 0001
 title: Noms alternatifs "hermez" / "iriz" (parking branding)
 type: chore
 priority: P3
-status: idea
+status: shipped
 ready:
-pr:
+pr: "#44"
 created: 2026-08-01
 ---
 
@@ -36,10 +36,13 @@ mais connotation mort), `propylon` (portail sans `z`).
 
 ## Critères d'acceptation
 
-- [ ] Décision de rebrand prise (ou piste définitivement abandonnée)
+- [x] Décision de rebrand prise (ou piste définitivement abandonnée)
 - [ ] Si rebrand : repo GitHub + `package.json` + URL Vercel + README alignés
 
 ## Notes / décisions
 
 - 2026-08-01 : `claude-proxy` retenu comme nom courant. Ces deux-là parkés.
+- 2026-08-09 : **résolue par le renommage** (PR #44) — nom `claude-proxy`
+  définitif (repo/GitHub/Vercel, v1.1.0) ; `hermez`/`iriz` restent parkés ici
+  pour un rebrand futur éventuel. Fiche déplacée en `done/`.
 - Idée basse priorité — ne bloque rien.

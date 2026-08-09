@@ -29,7 +29,6 @@
 | # | Titre | Type | Prio | Statut |
 |---|-------|------|------|--------|
 | [0007](0007-brique-sdk-passthrough-natif.md) | Brique SDK — passthrough natif (**différée**, arbitrage A) | feature | P1 | 💡 idea |
-| [0001](0001-noms-alternatifs-branding.md) | Noms alternatifs "hermez" / "iriz" (parking branding) | chore | P3 | 💡 idea |
 
 ## ✅ Livrées (`done/`)
 
@@ -39,3 +38,4 @@
 | [0008](done/0008-durcissement-securite-trous-live.md) | Durcissement sécurité — trous LIVE confirmés (TL1-8) | **P0** | #17, #32, #33, #34, #35, #36 |
 | [0004](done/0004-kill-switch-gardien.md) | Kill-switch / gardien — révocation (key-id / global / amont) + runbook | P1 | #31 |
 | [0002](done/0002-reponse-401-explicite-token-doc.md) | Réponse 401 explicite avec doc de génération de token | P2 | #21 |
+| [0001](done/0001-noms-alternatifs-branding.md) | Noms alternatifs "hermez" / "iriz" (parking branding) | P3 | #44 (rename) |
