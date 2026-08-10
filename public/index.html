@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Claude Proxy — Status & Auth</title>
+    <title>Claude Proxy</title>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
     <!-- Passkeys / WebAuthn browser helper (0009 Phase 3) — pinned + Subresource Integrity -->
@@ -76,31 +76,77 @@
         background: hsl(var(--background));
         color: hsl(var(--foreground));
         min-height: 100vh;
-        padding: 2rem 1rem;
+        padding: 2rem 1rem 4rem;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
       }
 
       .page {
-        max-width: 64rem;
+        max-width: 44rem;
         margin: 0 auto;
         display: flex;
         flex-direction: column;
         gap: 1.25rem;
       }
 
-      header h1 {
-        font-size: 1.5rem;
-        font-weight: 600;
-        letter-spacing: -0.025em;
-        margin-bottom: 0.25rem;
+      /* ── Top bar ─────────────────────────────────────────────── */
+      .topbar {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
       }
+      .brand { display: flex; gap: 0.75rem; align-items: center; }
+      .brand .mark {
+        width: 2.25rem; height: 2.25rem; flex-shrink: 0;
+        border-radius: calc(var(--radius) - 1px);
+        background: hsl(var(--primary) / 0.12);
+        color: hsl(var(--primary));
+        display: inline-flex; align-items: center; justify-content: center;
+      }
+      .brand .mark i { width: 20px; height: 20px; }
+      .brand h1 { font-size: 1.375rem; font-weight: 650; letter-spacing: -0.025em; line-height: 1.1; }
+      .brand p { color: hsl(var(--muted-foreground)); font-size: 0.8125rem; margin-top: 0.15rem; max-width: 34rem; }
 
-      header p {
+      .lang-toggle {
+        background: transparent;
+        border: 1px solid hsl(var(--border));
         color: hsl(var(--muted-foreground));
-        font-size: 0.875rem;
+        border-radius: 9999px;
+        padding: 0.25rem 0.625rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        cursor: pointer;
+        flex-shrink: 0;
+        transition: all 150ms ease;
       }
+      .lang-toggle:hover { color: hsl(var(--foreground)); background: hsl(var(--accent)); }
 
+      /* ── Status line (public) ────────────────────────────────── */
+      .statusline {
+        display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
+      }
+      .pill {
+        display: inline-flex; align-items: center; gap: 0.375rem;
+        padding: 0.25rem 0.625rem; border-radius: 9999px;
+        font-size: 0.8125rem; font-weight: 500;
+        background: hsl(var(--muted) / 0.6);
+        color: hsl(var(--muted-foreground));
+        border: 1px solid hsl(var(--border));
+      }
+      .pill i { width: 13px; height: 13px; }
+      .pill.ok { background: hsl(var(--success) / 0.14); color: hsl(var(--success)); border-color: hsl(var(--success) / 0.25); }
+      .pill.ko { background: hsl(var(--destructive) / 0.12); color: hsl(var(--destructive)); border-color: hsl(var(--destructive) / 0.25); }
+      .statusline .refresh-btn {
+        margin-left: auto;
+        background: transparent; border: none; color: hsl(var(--muted-foreground));
+        cursor: pointer; padding: 0.25rem; border-radius: calc(var(--radius) - 4px);
+        display: inline-flex; align-items: center; transition: all 150ms ease;
+      }
+      .statusline .refresh-btn:hover { color: hsl(var(--foreground)); background: hsl(var(--accent)); }
+      .statusline .refresh-btn i { width: 14px; height: 14px; }
+
+      /* ── Sections / cards ────────────────────────────────────── */
       .section {
         background: hsl(var(--card));
         border: 1px solid hsl(var(--border));
@@ -108,492 +154,671 @@
         box-shadow: var(--shadow-sm);
         padding: 1.25rem 1.5rem;
       }
+      .section.hero { border-color: hsl(var(--primary) / 0.4); box-shadow: 0 0 0 1px hsl(var(--primary) / 0.12), var(--shadow-sm); }
 
       .section-title {
-        font-size: 0.75rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: hsl(var(--muted-foreground));
-        margin-bottom: 0.875rem;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
+        font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
+        letter-spacing: 0.05em; color: hsl(var(--muted-foreground));
+        margin-bottom: 0.875rem; display: flex; align-items: center;
+        justify-content: space-between; gap: 0.5rem;
       }
-
+      .section-title .t-main { display: inline-flex; align-items: center; gap: 0.5rem; }
+      .section-title .t-main i { width: 15px; height: 15px; color: hsl(var(--primary)); }
       .section-title .refresh-btn {
-        background: transparent;
-        border: none;
-        color: hsl(var(--muted-foreground));
-        cursor: pointer;
-        padding: 0.25rem;
-        border-radius: calc(var(--radius) - 4px);
-        display: inline-flex;
-        align-items: center;
-        transition: all 150ms ease;
+        background: transparent; border: none; color: hsl(var(--muted-foreground));
+        cursor: pointer; padding: 0.25rem; border-radius: calc(var(--radius) - 4px);
+        display: inline-flex; align-items: center; transition: all 150ms ease;
       }
-
-      .section-title .refresh-btn:hover {
-        color: hsl(var(--foreground));
-        background: hsl(var(--accent));
-      }
-
+      .section-title .refresh-btn:hover { color: hsl(var(--foreground)); background: hsl(var(--accent)); }
       .section-title .refresh-btn i { width: 14px; height: 14px; }
 
-      .status-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 0.75rem;
-      }
+      .section-sub { font-size: 0.8125rem; color: hsl(var(--muted-foreground)); margin-bottom: 0.875rem; line-height: 1.5; }
 
-      .stat-card {
-        background: hsl(var(--muted) / 0.5);
-        border: 1px solid hsl(var(--border));
+      /* ── Connect card ────────────────────────────────────────── */
+      .field-label {
+        font-size: 0.75rem; font-weight: 600; color: hsl(var(--foreground));
+        margin-bottom: 0.375rem; display: block;
+      }
+      .copy-row {
+        display: flex; align-items: stretch; gap: 0.5rem; margin-bottom: 0.25rem;
+      }
+      .copy-row code {
+        flex: 1; min-width: 0;
+        font-family: var(--font-mono); font-size: 0.8125rem;
+        background: hsl(var(--muted) / 0.5); border: 1px solid hsl(var(--border));
         border-radius: calc(var(--radius) - 2px);
-        padding: 0.75rem 0.875rem;
+        padding: 0.5rem 0.75rem; color: hsl(var(--foreground));
+        overflow-x: auto; white-space: nowrap; display: flex; align-items: center;
+      }
+      .copy-btn {
+        flex-shrink: 0;
+        background: transparent; color: hsl(var(--foreground));
+        border: 1px solid hsl(var(--border)); border-radius: calc(var(--radius) - 2px);
+        padding: 0 0.75rem; font-size: 0.75rem; font-weight: 500; cursor: pointer;
+        display: inline-flex; align-items: center; gap: 0.375rem; transition: all 150ms ease;
+      }
+      .copy-btn:hover { background: hsl(var(--accent)); }
+      .copy-btn i { width: 13px; height: 13px; }
+
+      .help { font-size: 0.75rem; color: hsl(var(--muted-foreground)); line-height: 1.5; margin: 0.375rem 0 0; }
+      .help code, .inline-code {
+        font-family: var(--font-mono); font-size: 0.75rem;
+        background: hsl(var(--muted) / 0.6); padding: 0.05rem 0.3rem; border-radius: 4px;
+      }
+      .divider { height: 1px; background: hsl(var(--border)); margin: 1.125rem 0; border: 0; }
+
+      .steps { list-style: none; counter-reset: step; display: flex; flex-direction: column; gap: 0.625rem; }
+      .steps li { position: relative; padding-left: 1.875rem; font-size: 0.8125rem; line-height: 1.45; color: hsl(var(--foreground)); }
+      .steps li::before {
+        counter-increment: step; content: counter(step);
+        position: absolute; left: 0; top: -0.05rem;
+        width: 1.35rem; height: 1.35rem; border-radius: 9999px;
+        background: hsl(var(--primary) / 0.12); color: hsl(var(--primary));
+        font-size: 0.7rem; font-weight: 700;
+        display: inline-flex; align-items: center; justify-content: center;
       }
 
+      .models { display: flex; flex-direction: column; gap: 0.375rem; margin-top: 0.5rem; }
+      .model-row {
+        display: flex; align-items: center; gap: 0.5rem;
+        border: 1px solid hsl(var(--border)); border-radius: calc(var(--radius) - 2px);
+        padding: 0.375rem 0.5rem 0.375rem 0.75rem; background: hsl(var(--muted) / 0.35);
+      }
+      .model-row .name { font-family: var(--font-mono); font-size: 0.78rem; flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; }
+      .model-row .tag {
+        font-size: 0.625rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em;
+        padding: 0.05rem 0.4rem; border-radius: 9999px; flex-shrink: 0;
+        background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground));
+      }
+      .model-row .tag.reco { background: hsl(var(--success) / 0.16); color: hsl(var(--success)); }
+      .model-row .copy-btn { padding: 0.25rem 0.4rem; }
+      .model-row .copy-btn .copy-label { display: none; }
+
+      /* ── Buttons ─────────────────────────────────────────────── */
+      .button-primary {
+        background: hsl(var(--primary)); color: hsl(var(--primary-foreground));
+        border: none; border-radius: calc(var(--radius) - 2px);
+        padding: 0.625rem 1rem; font-size: 0.875rem; font-weight: 500; cursor: pointer;
+        transition: all 150ms ease; display: inline-flex; align-items: center;
+        justify-content: center; gap: 0.5rem;
+      }
+      .button-primary:hover:not(:disabled) { background: hsl(var(--primary) / 0.9); transform: translateY(-1px); }
+      .button-primary:disabled { background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); cursor: not-allowed; }
+      .button-primary i { width: 16px; height: 16px; }
+
+      .button-secondary {
+        background: transparent; color: hsl(var(--foreground));
+        border: 1px solid hsl(var(--border)); border-radius: calc(var(--radius) - 2px);
+        padding: 0.5rem 0.875rem; font-size: 0.8125rem; font-weight: 500; cursor: pointer;
+        transition: all 150ms ease; display: inline-flex; align-items: center;
+        justify-content: center; gap: 0.375rem;
+      }
+      .button-secondary:hover { background: hsl(var(--accent)); }
+      .button-secondary i { width: 14px; height: 14px; }
+
+      .btn-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+      .btn-row > * { flex: 1; min-width: 9rem; }
+
+      /* ── Owner entry / unlock ────────────────────────────────── */
+      .owner-entry .btn-row { margin-top: 0.25rem; }
+      details.secret { margin-top: 0.75rem; }
+      details.secret > summary {
+        cursor: pointer; font-size: 0.8125rem; color: hsl(var(--muted-foreground));
+        display: inline-flex; align-items: center; gap: 0.375rem; list-style: none; user-select: none;
+      }
+      details.secret > summary::-webkit-details-marker { display: none; }
+      details.secret > summary::before { content: '▸'; font-size: 0.7rem; transition: transform 150ms ease; }
+      details.secret[open] > summary::before { transform: rotate(90deg); }
+      details.secret > summary:hover { color: hsl(var(--foreground)); }
+      .secret-body { margin-top: 0.75rem; }
+
+      .input-group { margin-bottom: 0.75rem; }
+      .input-group label { display: block; margin-bottom: 0.375rem; font-size: 0.8125rem; font-weight: 500; }
+      .input-group input {
+        width: 100%; padding: 0.5rem 0.75rem;
+        background: hsl(var(--background)); border: 1px solid hsl(var(--input));
+        border-radius: calc(var(--radius) - 2px); font-size: 0.875rem;
+        color: hsl(var(--foreground)); font-family: var(--font-mono);
+      }
+      .input-group input:focus { outline: none; border-color: hsl(var(--ring)); box-shadow: 0 0 0 3px hsl(var(--ring) / 0.2); }
+
+      .auth-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+      .auth-row p { font-size: 0.875rem; color: hsl(var(--muted-foreground)); }
+
+      /* ── Owner detailed status ───────────────────────────────── */
+      .status-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+      .stat-card {
+        background: hsl(var(--muted) / 0.5); border: 1px solid hsl(var(--border));
+        border-radius: calc(var(--radius) - 2px); padding: 0.75rem 0.875rem;
+      }
       .stat-card .label {
-        font-size: 0.75rem;
-        color: hsl(var(--muted-foreground));
-        margin-bottom: 0.25rem;
-        display: flex;
-        align-items: center;
-        gap: 0.375rem;
+        font-size: 0.75rem; color: hsl(var(--muted-foreground));
+        margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.375rem;
       }
-
       .stat-card .label i { width: 12px; height: 12px; }
-
-      .stat-card .value {
-        font-size: 0.95rem;
-        font-weight: 500;
-        color: hsl(var(--foreground));
-        font-variant-numeric: tabular-nums;
-      }
+      .stat-card .value { font-size: 0.95rem; font-weight: 500; color: hsl(var(--foreground)); font-variant-numeric: tabular-nums; }
 
       .badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.375rem;
-        padding: 0.125rem 0.5rem;
-        border-radius: 9999px;
-        font-size: 0.8125rem;
-        font-weight: 500;
+        display: inline-flex; align-items: center; gap: 0.375rem;
+        padding: 0.125rem 0.5rem; border-radius: 9999px; font-size: 0.8125rem; font-weight: 500;
       }
-
       .badge i { width: 12px; height: 12px; }
       .badge.ok { background: hsl(var(--success) / 0.15); color: hsl(var(--success)); }
       .badge.ko { background: hsl(var(--destructive) / 0.12); color: hsl(var(--destructive)); }
       .badge.warn { background: hsl(var(--primary) / 0.12); color: hsl(var(--primary)); }
 
-      .button-primary {
-        background: hsl(var(--primary));
-        color: hsl(var(--primary-foreground));
-        border: none;
-        border-radius: calc(var(--radius) - 2px);
-        padding: 0.625rem 1rem;
-        font-size: 0.875rem;
-        font-weight: 500;
-        cursor: pointer;
-        width: 100%;
-        transition: all 150ms ease;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.5rem;
-      }
+      .warnings { margin-bottom: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; }
+      .warning-item { border-radius: calc(var(--radius) - 2px); padding: 0.75rem 0.875rem; font-size: 0.8125rem; line-height: 1.5; display: flex; gap: 0.5rem; align-items: flex-start; }
+      .warning-item i { width: 16px; height: 16px; flex-shrink: 0; margin-top: 2px; }
+      .warning-item .msg { font-weight: 500; margin-bottom: 0.25rem; }
+      .warning-item .fix { color: hsl(var(--muted-foreground)); font-weight: 400; }
+      .warning-item.error { background: hsl(var(--destructive) / 0.08); border: 1px solid hsl(var(--destructive) / 0.25); color: hsl(var(--destructive)); }
+      .warning-item.warning { background: hsl(var(--primary) / 0.08); border: 1px solid hsl(var(--primary) / 0.25); color: hsl(var(--primary)); }
 
-      .button-primary:hover:not(:disabled) {
-        background: hsl(var(--primary) / 0.9);
-        transform: translateY(-1px);
-      }
-
-      .button-primary:disabled {
-        background: hsl(var(--muted));
-        color: hsl(var(--muted-foreground));
-        cursor: not-allowed;
-      }
-
-      .button-primary i { width: 16px; height: 16px; }
-
-      .button-secondary {
-        background: transparent;
-        color: hsl(var(--foreground));
-        border: 1px solid hsl(var(--border));
-        border-radius: calc(var(--radius) - 2px);
-        padding: 0.5rem 0.875rem;
-        font-size: 0.8125rem;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all 150ms ease;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.375rem;
-      }
-
-      .button-secondary:hover { background: hsl(var(--accent)); }
-      .button-secondary i { width: 14px; height: 14px; }
-
-      .auth-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 1rem;
-      }
-
-      .auth-row p {
-        font-size: 0.875rem;
-        color: hsl(var(--muted-foreground));
-      }
-
-      .input-group { margin-bottom: 0.75rem; }
-
-      .input-group label {
-        display: block;
-        margin-bottom: 0.375rem;
-        font-size: 0.8125rem;
-        font-weight: 500;
-      }
-
-      .input-group input {
-        width: 100%;
-        padding: 0.5rem 0.75rem;
-        background: hsl(var(--background));
-        border: 1px solid hsl(var(--input));
-        border-radius: calc(var(--radius) - 2px);
-        font-size: 0.875rem;
-        color: hsl(var(--foreground));
-        font-family: var(--font-mono);
-      }
-
-      .input-group input:focus {
-        outline: none;
-        border-color: hsl(var(--ring));
-        box-shadow: 0 0 0 3px hsl(var(--ring) / 0.2);
-      }
-
-      .json-output {
-        margin-top: 1rem;
-        background: hsl(var(--muted) / 0.4);
-        border: 1px solid hsl(var(--border));
-        border-radius: calc(var(--radius) - 2px);
-        padding: 0.875rem;
-        font-family: var(--font-mono);
-        font-size: 0.75rem;
-        line-height: 1.5;
-        color: hsl(var(--foreground));
-        overflow-x: auto;
-        white-space: pre;
-        max-height: 24rem;
-        overflow-y: auto;
-      }
-
-      .error-inline {
-        color: hsl(var(--destructive));
-        font-size: 0.8125rem;
-        margin-top: 0.5rem;
-        display: flex;
-        align-items: center;
-        gap: 0.375rem;
-      }
-
+      .error-inline { color: hsl(var(--destructive)); font-size: 0.8125rem; margin-top: 0.5rem; display: flex; align-items: center; gap: 0.375rem; }
       .error-inline i { width: 14px; height: 14px; }
 
       .hidden { display: none !important; }
 
       .loading-spinner {
-        display: inline-block;
-        width: 0.875rem;
-        height: 0.875rem;
-        border: 2px solid hsl(var(--primary-foreground) / 0.3);
-        border-radius: 50%;
-        border-top-color: hsl(var(--primary-foreground));
-        animation: spin 1s linear infinite;
+        display: inline-block; width: 0.875rem; height: 0.875rem;
+        border: 2px solid hsl(var(--primary-foreground) / 0.3); border-radius: 50%;
+        border-top-color: hsl(var(--primary-foreground)); animation: spin 1s linear infinite;
       }
-
       @keyframes spin { to { transform: rotate(360deg); } }
 
-      .curl-hint {
-        font-family: var(--font-mono);
-        font-size: 0.75rem;
-        color: hsl(var(--muted-foreground));
-        background: hsl(var(--muted) / 0.5);
-        padding: 0.5rem 0.75rem;
-        border-radius: calc(var(--radius) - 2px);
-        margin-top: 0.75rem;
-        overflow-x: auto;
-        white-space: nowrap;
+      .json-output {
+        margin-top: 0.75rem; background: hsl(var(--muted) / 0.4); border: 1px solid hsl(var(--border));
+        border-radius: calc(var(--radius) - 2px); padding: 0.875rem; font-family: var(--font-mono);
+        font-size: 0.75rem; line-height: 1.5; color: hsl(var(--foreground)); overflow-x: auto;
+        white-space: pre; max-height: 24rem; overflow-y: auto;
       }
 
-      .warnings { margin-bottom: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; }
-
-      .warning-item {
-        border-radius: calc(var(--radius) - 2px);
-        padding: 0.75rem 0.875rem;
-        font-size: 0.8125rem;
-        line-height: 1.5;
-        display: flex;
-        gap: 0.5rem;
-        align-items: flex-start;
-      }
-
-      .warning-item i { width: 16px; height: 16px; flex-shrink: 0; margin-top: 2px; }
-      .warning-item .msg { font-weight: 500; margin-bottom: 0.25rem; }
-      .warning-item .fix { color: hsl(var(--muted-foreground)); font-weight: 400; }
-
-      .warning-item.error {
-        background: hsl(var(--destructive) / 0.08);
-        border: 1px solid hsl(var(--destructive) / 0.25);
-        color: hsl(var(--destructive));
-      }
-      .warning-item.warning {
-        background: hsl(var(--primary) / 0.08);
-        border: 1px solid hsl(var(--primary) / 0.25);
-        color: hsl(var(--primary));
-      }
-
-      /* ── Clients section ───────────────────────────────────────── */
-      .clients-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 0.8125rem;
-      }
-      .clients-table th,
-      .clients-table td {
-        text-align: left;
-        padding: 0.5rem 0.625rem;
-        border-bottom: 1px solid hsl(var(--border));
-        vertical-align: middle;
-      }
-      .clients-table th {
-        font-size: 0.6875rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-        color: hsl(var(--muted-foreground));
-        background: hsl(var(--muted) / 0.4);
-      }
-      .clients-table td.mono,
-      .clients-table td .mono {
-        font-family: var(--font-mono);
-        font-size: 0.75rem;
-      }
-      .clients-table .client-ua {
-        display: inline-block;
-        padding: 0.0625rem 0.375rem;
-        border-radius: 9999px;
-        background: hsl(var(--secondary));
-        color: hsl(var(--secondary-foreground));
-        font-size: 0.6875rem;
-        font-weight: 500;
-      }
-      .clients-table .num {
-        font-variant-numeric: tabular-nums;
-        text-align: right;
-      }
-      .badge.new {
-        background: hsl(var(--destructive) / 0.18);
-        color: hsl(var(--destructive));
-        animation: pulse 2s ease-in-out infinite;
-      }
-      @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.6; }
-      }
-      .badge.revoked {
-        background: hsl(var(--muted));
-        color: hsl(var(--muted-foreground));
-      }
-      .button-danger {
-        background: hsl(var(--destructive));
-        color: hsl(var(--destructive-foreground));
-        border: none;
-        border-radius: calc(var(--radius) - 4px);
-        padding: 0.25rem 0.625rem;
-        font-size: 0.6875rem;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all 150ms ease;
-      }
+      /* ── Clients table ───────────────────────────────────────── */
+      .clients-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+      .clients-table th, .clients-table td { text-align: left; padding: 0.5rem 0.625rem; border-bottom: 1px solid hsl(var(--border)); vertical-align: middle; }
+      .clients-table th { font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: hsl(var(--muted-foreground)); background: hsl(var(--muted) / 0.4); }
+      .clients-table td.mono, .clients-table td .mono { font-family: var(--font-mono); font-size: 0.75rem; }
+      .clients-table .client-ua { display: inline-block; padding: 0.0625rem 0.375rem; border-radius: 9999px; background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground)); font-size: 0.6875rem; font-weight: 500; }
+      .clients-table .num { font-variant-numeric: tabular-nums; text-align: right; }
+      .badge.new { background: hsl(var(--destructive) / 0.18); color: hsl(var(--destructive)); animation: pulse 2s ease-in-out infinite; }
+      @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+      .badge.revoked { background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); }
+      .button-danger { background: hsl(var(--destructive)); color: hsl(var(--destructive-foreground)); border: none; border-radius: calc(var(--radius) - 4px); padding: 0.25rem 0.625rem; font-size: 0.6875rem; font-weight: 500; cursor: pointer; transition: all 150ms ease; }
       .button-danger:hover:not(:disabled) { background: hsl(var(--destructive) / 0.85); }
       .button-danger:disabled { opacity: 0.5; cursor: not-allowed; }
-      .button-ghost {
-        background: transparent;
-        color: hsl(var(--muted-foreground));
-        border: 1px solid hsl(var(--border));
-        border-radius: calc(var(--radius) - 4px);
-        padding: 0.25rem 0.625rem;
-        font-size: 0.6875rem;
-        font-weight: 500;
-        cursor: pointer;
-      }
+      .button-ghost { background: transparent; color: hsl(var(--muted-foreground)); border: 1px solid hsl(var(--border)); border-radius: calc(var(--radius) - 4px); padding: 0.25rem 0.625rem; font-size: 0.6875rem; font-weight: 500; cursor: pointer; }
       .button-ghost:hover:not(:disabled) { background: hsl(var(--accent)); color: hsl(var(--foreground)); }
+      .clients-empty { text-align: center; color: hsl(var(--muted-foreground)); padding: 1.5rem 0; font-size: 0.8125rem; }
 
-      .clients-empty {
-        text-align: center;
-        color: hsl(var(--muted-foreground));
-        padding: 1.5rem 0;
-        font-size: 0.8125rem;
-      }
-
-      .chart-wrap {
-        position: relative;
-        height: 18rem;
-        margin-top: 0.5rem;
-      }
-
-      .section-sub {
-        font-size: 0.75rem;
-        color: hsl(var(--muted-foreground));
-        margin-bottom: 0.75rem;
-      }
+      .chart-wrap { position: relative; height: 18rem; margin-top: 0.5rem; }
 
       @media (max-width: 48rem) {
-        .clients-table th.opt,
-        .clients-table td.opt { display: none; }
+        .clients-table th.opt, .clients-table td.opt { display: none; }
+      }
+      @media (max-width: 30rem) {
+        .status-grid { grid-template-columns: 1fr; }
+        .btn-row > * { flex-basis: 100%; }
       }
     </style>
   </head>
   <body>
     <div class="page">
-      <header>
-        <h1>Claude Proxy</h1>
-        <p>OAuth status, sign-in and full dashboard</p>
-      </header>
-
-      <section class="section">
-        <div class="section-title">
-          <span>Proxy status</span>
-          <button class="refresh-btn" onclick="refreshStatus()" aria-label="Refresh">
-            <i data-lucide="refresh-cw"></i>
-          </button>
-        </div>
-        <div id="warnings" class="warnings hidden"></div>
-        <div class="status-grid" id="statusGrid">
-          <div class="stat-card"><div class="label"><i data-lucide="shield"></i>Auth</div><div class="value" id="statAuth">…</div></div>
-          <div class="stat-card"><div class="label"><i data-lucide="clock"></i>Expires in</div><div class="value" id="statExpires">…</div></div>
-          <div class="stat-card"><div class="label"><i data-lucide="database"></i>Storage</div><div class="value" id="statStorage">…</div></div>
-          <div class="stat-card"><div class="label"><i data-lucide="key"></i>API key</div><div class="value" id="statApiKey">…</div></div>
-          <div class="stat-card"><div class="label"><i data-lucide="cloud"></i>Platform</div><div class="value" id="statPlatform">…</div></div>
-          <div class="stat-card"><div class="label"><i data-lucide="git-branch"></i>Env</div><div class="value" id="statEnv">…</div></div>
-        </div>
-        <div class="curl-hint">curl <span id="baseUrl"></span>/auth/status</div>
-      </section>
-
-      <section class="section" id="authSection">
-        <div class="section-title"><span>Claude sign-in</span></div>
-
-        <div id="unauthenticatedView" class="hidden">
-          <button id="startAuthBtn" class="button-primary" onclick="startAuth()">
-            <i data-lucide="key-round"></i>
-            <span id="btnText">Connect with Claude</span>
-          </button>
-          <div class="input-group" style="margin-top: 1rem;">
-            <label for="authCode">Paste OAuth code (manual fallback)</label>
-            <input type="text" id="authCode" placeholder="code#verifier" />
+      <!-- ── Top bar ─────────────────────────────────────────── -->
+      <div class="topbar">
+        <div class="brand">
+          <span class="mark"><i data-lucide="arrow-left-right"></i></span>
+          <div>
+            <h1>Claude Proxy</h1>
+            <p data-i18n="tagline"></p>
           </div>
-          <button class="button-secondary" style="width: 100%;" onclick="submitCode()">
-            <i data-lucide="check"></i>Submit code
+        </div>
+        <button class="lang-toggle" id="langToggle" onclick="toggleLang()">EN</button>
+      </div>
+
+      <!-- ── Status line (public, always visible) ────────────── -->
+      <div class="statusline" id="statusline">
+        <span class="pill" id="pillOnline"><i data-lucide="activity"></i><span data-i18n="status.online"></span></span>
+        <span class="pill" id="pillClaude"><i data-lucide="loader"></i>…</span>
+        <span class="pill" id="pillKey"><i data-lucide="loader"></i>…</span>
+        <button class="refresh-btn" onclick="refreshStatus()" data-i18n-title="refresh"><i data-lucide="refresh-cw"></i></button>
+      </div>
+
+      <!-- ── Connect Cursor (the hero) ───────────────────────── -->
+      <section class="section hero">
+        <div class="section-title"><span class="t-main"><i data-lucide="plug"></i><span data-i18n="connect.title"></span></span></div>
+        <p class="section-sub" data-i18n="connect.subtitle"></p>
+
+        <label class="field-label" data-i18n="connect.baseUrl"></label>
+        <div class="copy-row">
+          <code id="baseUrl">…/v1</code>
+          <button class="copy-btn" onclick="copyText(document.getElementById('baseUrl').textContent, this)">
+            <i data-lucide="copy"></i><span class="copy-label" data-i18n="copy"></span>
           </button>
         </div>
+        <p class="help" data-i18n-html="connect.baseUrlHelp"></p>
 
-        <div id="authenticatedView" class="hidden auth-row">
-          <p>Signed in — tokens stored server-side, available to EC2 clients</p>
-          <button class="button-secondary" onclick="logout()">
-            <i data-lucide="log-out"></i>Sign out
-          </button>
+        <hr class="divider" />
+
+        <label class="field-label" data-i18n="connect.apiKey"></label>
+        <p class="help" data-i18n-html="connect.apiKeyHelp"></p>
+
+        <hr class="divider" />
+
+        <label class="field-label" data-i18n="connect.models"></label>
+        <p class="help" data-i18n-html="connect.modelsHelp"></p>
+        <div class="models" id="models"></div>
+
+        <hr class="divider" />
+
+        <label class="field-label" data-i18n="connect.steps"></label>
+        <ol class="steps">
+          <li data-i18n="connect.step1"></li>
+          <li data-i18n-html="connect.step2"></li>
+          <li data-i18n-html="connect.step3"></li>
+          <li data-i18n="connect.step4"></li>
+        </ol>
+      </section>
+
+      <!-- ── Owner area (unlock) ─────────────────────────────── -->
+      <section class="section owner-entry">
+        <div class="section-title">
+          <span class="t-main"><i data-lucide="lock"></i><span data-i18n="owner.entry"></span></span>
+          <span id="ownerStateBadge"></span>
         </div>
 
-        <div id="authError" class="error-inline hidden">
-          <i data-lucide="alert-circle"></i><span id="authErrorText"></span>
+        <div id="ownerLockedState">
+          <p class="section-sub" data-i18n="owner.entryHint"></p>
+          <div class="btn-row">
+            <button class="button-primary" onclick="unlockWithPasskey()">
+              <i data-lucide="fingerprint"></i><span data-i18n="owner.unlockPasskey"></span>
+            </button>
+          </div>
+          <details class="secret">
+            <summary data-i18n="owner.useSecret"></summary>
+            <div class="secret-body">
+              <div class="input-group">
+                <label for="apiKeyInput" data-i18n="owner.secretLabel"></label>
+                <input type="password" id="apiKeyInput" placeholder="ADMIN_SECRET" autocomplete="off" />
+              </div>
+              <button class="button-secondary" style="width:100%;" onclick="tryUnlockWithSecret()">
+                <i data-lucide="unlock"></i><span data-i18n="owner.unlock"></span>
+              </button>
+            </div>
+          </details>
+          <div id="unlockError" class="error-inline hidden">
+            <i data-lucide="alert-circle"></i><span id="unlockErrorText"></span>
+          </div>
+        </div>
+
+        <div id="ownerUnlockedState" class="hidden">
+          <div class="auth-row">
+            <span class="badge ok"><i data-lucide="unlock"></i><span data-i18n="owner.unlocked"></span></span>
+            <button class="button-secondary" onclick="lockOwner()">
+              <i data-lucide="lock"></i><span data-i18n="owner.lock"></span>
+            </button>
+          </div>
         </div>
       </section>
 
-      <section class="section">
-        <div class="section-title"><span>Full dashboard (admin secret required)</span></div>
-        <div class="input-group">
-          <label for="apiKeyInput">Admin secret</label>
-          <input type="password" id="apiKeyInput" placeholder="ADMIN_SECRET (not a client key)" autocomplete="off" />
-        </div>
+      <!-- ── Owner view (revealed after unlock) ──────────────── -->
+      <div id="ownerView" class="hidden" style="display:flex; flex-direction:column; gap:1.25rem;">
 
-        <!-- Passkeys (0009 Phase 3): unlock admin with Touch ID instead of pasting the secret -->
-        <div id="passkeyBlock" style="margin: 0.25rem 0 0.75rem; padding: 0.75rem 0; border-top: 1px solid hsl(var(--border));">
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:0.5rem; margin-bottom:0.5rem;">
-            <span style="font-size:0.8125rem; font-weight:500; display:inline-flex; align-items:center; gap:0.375rem;">
-              <i data-lucide="fingerprint"></i>Passkey (Touch ID / clé FIDO2)
-            </span>
+        <!-- Detailed status -->
+        <section class="section">
+          <div class="section-title">
+            <span class="t-main"><i data-lucide="gauge"></i><span data-i18n="status.detailTitle"></span></span>
+            <button class="refresh-btn" onclick="refreshStatus()" data-i18n-title="refresh"><i data-lucide="refresh-cw"></i></button>
+          </div>
+          <div id="warnings" class="warnings hidden"></div>
+          <div class="status-grid">
+            <div class="stat-card"><div class="label"><i data-lucide="shield"></i><span data-i18n="stat.auth"></span></div><div class="value" id="statAuth">…</div></div>
+            <div class="stat-card"><div class="label"><i data-lucide="clock"></i><span data-i18n="stat.expires"></span></div><div class="value" id="statExpires">…</div></div>
+            <div class="stat-card"><div class="label"><i data-lucide="database"></i><span data-i18n="stat.storage"></span></div><div class="value" id="statStorage">…</div></div>
+            <div class="stat-card"><div class="label"><i data-lucide="key"></i><span data-i18n="stat.apikey"></span></div><div class="value" id="statApiKey">…</div></div>
+            <div class="stat-card"><div class="label"><i data-lucide="cloud"></i><span data-i18n="stat.platform"></span></div><div class="value" id="statPlatform">…</div></div>
+            <div class="stat-card"><div class="label"><i data-lucide="git-branch"></i><span data-i18n="stat.env"></span></div><div class="value" id="statEnv">…</div></div>
+          </div>
+        </section>
+
+        <!-- Claude sign-in -->
+        <section class="section" id="authSection">
+          <div class="section-title"><span class="t-main"><i data-lucide="user-round"></i><span data-i18n="signin.title"></span></span></div>
+
+          <div id="unauthenticatedView" class="hidden">
+            <button id="startAuthBtn" class="button-primary" style="width:100%;" onclick="startAuth()">
+              <i data-lucide="key-round"></i><span id="btnText" data-i18n="signin.connect"></span>
+            </button>
+            <div class="input-group" style="margin-top: 1rem;">
+              <label for="authCode" data-i18n="signin.manual"></label>
+              <input type="text" id="authCode" placeholder="code#verifier" />
+            </div>
+            <button class="button-secondary" style="width: 100%;" onclick="submitCode()">
+              <i data-lucide="check"></i><span data-i18n="signin.submit"></span>
+            </button>
+          </div>
+
+          <div id="authenticatedView" class="hidden auth-row">
+            <p data-i18n="signin.signedIn"></p>
+            <button class="button-secondary" onclick="logout()">
+              <i data-lucide="log-out"></i><span data-i18n="signin.signout"></span>
+            </button>
+          </div>
+
+          <div id="authError" class="error-inline hidden">
+            <i data-lucide="alert-circle"></i><span id="authErrorText"></span>
+          </div>
+        </section>
+
+        <!-- Passkeys management -->
+        <section class="section">
+          <div class="section-title">
+            <span class="t-main"><i data-lucide="fingerprint"></i><span data-i18n="passkey.title"></span></span>
             <span id="passkeySessionBadge"></span>
           </div>
-          <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-            <button class="button-secondary" style="flex:1;" onclick="unlockWithPasskey()">
-              <i data-lucide="unlock"></i>Déverrouiller avec passkey
-            </button>
-            <button class="button-secondary" style="flex:1;" onclick="enrollPasskey()">
-              <i data-lucide="plus"></i>Ajouter un passkey
+          <div class="btn-row">
+            <button class="button-secondary" onclick="enrollPasskey()">
+              <i data-lucide="plus"></i><span data-i18n="passkey.add"></span>
             </button>
           </div>
-          <div id="passkeyList" style="margin-top:0.5rem; font-size:0.8125rem;"></div>
+          <div id="passkeyList" style="margin-top:0.75rem; font-size:0.8125rem;"></div>
           <div id="passkeyError" class="error-inline hidden">
             <i data-lucide="alert-circle"></i><span id="passkeyErrorText"></span>
           </div>
-        </div>
+        </section>
 
-        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-          <button class="button-secondary" style="flex: 1;" onclick="loadFullStatus()">
-            <i data-lucide="eye"></i>Fetch /api/status/full
-          </button>
-          <button class="button-secondary" style="flex: 1;" onclick="loadClients()">
-            <i data-lucide="users"></i>Load clients & usage
-          </button>
-        </div>
-        <pre class="json-output hidden" id="jsonOutput"></pre>
-        <div id="jsonError" class="error-inline hidden">
-          <i data-lucide="alert-circle"></i><span id="jsonErrorText"></span>
-        </div>
-      </section>
+        <!-- Clients & usage loader + advanced -->
+        <section class="section">
+          <div class="section-title"><span class="t-main"><i data-lucide="bar-chart-3"></i><span data-i18n="monitor.title"></span></span></div>
+          <div class="btn-row">
+            <button class="button-secondary" onclick="loadClients()">
+              <i data-lucide="users"></i><span data-i18n="monitor.load"></span>
+            </button>
+          </div>
+          <details class="secret" style="margin-top:0.875rem;">
+            <summary data-i18n="monitor.advanced"></summary>
+            <div class="secret-body">
+              <button class="button-secondary" style="width:100%;" onclick="loadFullStatus()">
+                <i data-lucide="eye"></i><span data-i18n="monitor.rawStatus"></span>
+              </button>
+              <pre class="json-output hidden" id="jsonOutput"></pre>
+              <div id="jsonError" class="error-inline hidden">
+                <i data-lucide="alert-circle"></i><span id="jsonErrorText"></span>
+              </div>
+            </div>
+          </details>
+        </section>
 
-      <section class="section hidden" id="clientsSection">
-        <div class="section-title">
-          <span>Clients
-            <span id="clientsBackend" style="font-size: 0.6875rem; color: hsl(var(--muted-foreground)); font-weight: 400; text-transform: none; letter-spacing: normal; margin-left: 0.5rem;"></span>
-          </span>
-          <button class="refresh-btn" onclick="loadClients()" aria-label="Refresh clients">
-            <i data-lucide="refresh-cw"></i>
-          </button>
-        </div>
-        <p class="section-sub">One row per <span class="mono" style="font-family: var(--font-mono);">hash(api_key + ip)</span>. A <span class="badge new" style="padding: 0 0.375rem;">NEW</span> badge flags clients first seen in the last 24h — check IP / UA / country to confirm it's you.</p>
-        <div id="clientsTableWrap">
-          <div class="clients-empty">No requests tracked yet.</div>
-        </div>
-        <div id="clientsError" class="error-inline hidden">
-          <i data-lucide="alert-circle"></i><span id="clientsErrorText"></span>
-        </div>
-      </section>
+        <!-- Clients table -->
+        <section class="section hidden" id="clientsSection">
+          <div class="section-title">
+            <span class="t-main"><i data-lucide="users"></i><span data-i18n="clients.title"></span>
+              <span id="clientsBackend" style="font-size: 0.6875rem; color: hsl(var(--muted-foreground)); font-weight: 400; text-transform: none; letter-spacing: normal; margin-left: 0.5rem;"></span>
+            </span>
+            <button class="refresh-btn" onclick="loadClients()" data-i18n-title="refresh"><i data-lucide="refresh-cw"></i></button>
+          </div>
+          <p class="section-sub" id="clientsSub" data-i18n="clients.sub"></p>
+          <div id="clientsTableWrap">
+            <div class="clients-empty" data-i18n="clients.empty"></div>
+          </div>
+          <div id="clientsError" class="error-inline hidden">
+            <i data-lucide="alert-circle"></i><span id="clientsErrorText"></span>
+          </div>
+        </section>
 
-      <section class="section hidden" id="usageSection">
-        <div class="section-title">
-          <span>Usage (last <span id="usageDays">30</span> days)</span>
-          <button class="refresh-btn" onclick="loadClients()" aria-label="Refresh usage">
-            <i data-lucide="refresh-cw"></i>
-          </button>
-        </div>
-        <p class="section-sub">Requests per day, stacked by client (top 5 + Other).</p>
-        <div class="chart-wrap">
-          <canvas id="usageChart"></canvas>
-        </div>
-      </section>
+        <!-- Usage chart -->
+        <section class="section hidden" id="usageSection">
+          <div class="section-title">
+            <span class="t-main"><i data-lucide="trending-up"></i><span id="usageTitle"></span></span>
+            <button class="refresh-btn" onclick="loadClients()" data-i18n-title="refresh"><i data-lucide="refresh-cw"></i></button>
+          </div>
+          <p class="section-sub" data-i18n="usage.sub"></p>
+          <div class="chart-wrap"><canvas id="usageChart"></canvas></div>
+        </section>
+      </div>
     </div>
 
     <script>
-      lucide.createIcons()
+      // ── i18n ───────────────────────────────────────────────────────────
+      const I18N = {
+        en: {
+          'tagline': 'Use your Claude Pro/Max subscription as the model backend in Cursor — no extra API bill.',
+          'refresh': 'Refresh',
+          'copy': 'Copy', 'copied': 'Copied',
+          'status.online': 'Proxy online',
+          'status.claudeOk': 'Claude connected', 'status.claudeKo': 'Claude disconnected',
+          'status.keyOk': 'API key set', 'status.keyKo': 'API key missing',
+          'status.detailTitle': 'Detailed status',
+          'connect.title': 'Connect Cursor',
+          'connect.subtitle': 'Point Cursor at this proxy in three settings, then chat with Claude.',
+          'connect.baseUrl': 'Base URL',
+          'connect.baseUrlHelp': 'In Cursor → Settings → Models, enable <span class="inline-code">Override OpenAI Base URL</span> and paste this. Keep the <span class="inline-code">/v1</span>.',
+          'connect.apiKey': 'API key',
+          'connect.apiKeyHelp': 'In the <span class="inline-code">OpenAI API Key</span> field, paste <em>your</em> proxy key (the one set in Vercel) — not an Anthropic key. It protects your proxy from unauthorized use.',
+          'connect.models': 'Models to add',
+          'connect.modelsHelp': 'Click <span class="inline-code">Add Model</span> and type one of these. Well-known names (<span class="inline-code">gpt-4o</span>…) are intercepted by Cursor, so use these custom names.',
+          'connect.steps': 'Steps',
+          'connect.step1': 'Open Cursor settings (Cmd/Ctrl+Shift+J) → Models tab.',
+          'connect.step2': 'Enable <span class="inline-code">Override OpenAI Base URL</span> and paste the Base URL above.',
+          'connect.step3': 'Put your key in <span class="inline-code">OpenAI API Key</span>.',
+          'connect.step4': 'Add one of the models below, select it, and send a test message.',
+          'owner.entry': 'Owner area',
+          'owner.entryHint': 'Detailed status, Claude sign-in, passkeys, clients & usage.',
+          'owner.unlockPasskey': 'Unlock with passkey',
+          'owner.useSecret': 'Use admin secret instead',
+          'owner.secretLabel': 'Admin secret',
+          'owner.unlock': 'Unlock',
+          'owner.unlocked': 'Unlocked', 'owner.locked': 'Locked', 'owner.lock': 'Lock',
+          'owner.needSecret': 'Enter the admin secret first.',
+          'owner.badSecret': 'Invalid admin secret.',
+          'stat.auth': 'Auth', 'stat.expires': 'Expires in', 'stat.storage': 'Storage',
+          'stat.apikey': 'API key', 'stat.platform': 'Platform', 'stat.env': 'Env',
+          'badge.connected': 'connected', 'badge.disconnected': 'disconnected',
+          'badge.configured': 'configured', 'badge.notset': 'not set', 'badge.broken': 'broken',
+          'signin.title': 'Claude sign-in',
+          'signin.connect': 'Connect with Claude',
+          'signin.manual': 'Paste OAuth code (manual fallback)',
+          'signin.submit': 'Submit code',
+          'signin.signedIn': 'Signed in — tokens are stored server-side and used for all client requests.',
+          'signin.signout': 'Sign out',
+          'signin.connecting': 'Connecting…', 'signin.waiting': 'Waiting for authentication…',
+          'signin.needSecret': 'Unlock the owner area first (passkey or admin secret).',
+          'signin.badSecret': 'Invalid admin secret', 'signin.startFail': 'Failed to start authentication',
+          'signin.noUrl': 'No auth URL received', 'signin.pasteFirst': 'Paste an OAuth code first',
+          'signin.failed': 'Authentication failed', 'signin.submitFail': 'Failed to submit code',
+          'signin.statusFail': 'Failed to fetch status', 'signin.signoutFail': 'Failed to sign out',
+          'passkey.title': 'Passkeys (Touch ID / FIDO2 key)',
+          'passkey.add': 'Add a passkey',
+          'passkey.none': 'No passkey enrolled.',
+          'passkey.session': 'passkey session', 'passkey.lock': 'lock',
+          'passkey.unsupported': 'This browser does not support passkeys.',
+          'passkey.cancelled': 'Cancelled, or no matching passkey.',
+          'passkey.cancelledShort': 'Cancelled.',
+          'passkey.unlockFail': 'Unlock failed', 'passkey.notVerified': 'Passkey not verified',
+          'passkey.optionsFail': 'Failed to get options',
+          'passkey.enrollNeedAdmin': 'Enter the admin secret first (or unlock with an existing passkey).',
+          'passkey.enrollFail': 'Enrollment failed', 'passkey.deleteFail': 'Deletion failed',
+          'passkey.namePrompt': 'Name this passkey (e.g. "MacBook Touch ID"):',
+          'passkey.deleteConfirm': 'Delete this passkey?',
+          'monitor.title': 'Clients & usage',
+          'monitor.load': 'Load clients & usage',
+          'monitor.advanced': 'Advanced',
+          'monitor.rawStatus': 'Fetch full status (JSON)',
+          'clients.title': 'Clients',
+          'clients.sub': 'One row per hash(API key + IP). A NEW badge flags clients first seen in the last 24h — check IP / UA / country to confirm it is you.',
+          'clients.empty': 'No requests tracked yet.',
+          'clients.emptyPopulate': 'No requests tracked yet. Send a request to /v1/chat/completions to populate.',
+          'clients.loadFail': 'Failed to load clients', 'clients.needSecret': 'Unlock the owner area first.',
+          'col.fp': 'FP', 'col.ip': 'IP', 'col.country': 'Country', 'col.host': 'Host / ASN',
+          'col.ua': 'UA', 'col.key': 'Key', 'col.first': 'First', 'col.last': 'Last',
+          'col.req': 'Req', 'col.tokens': 'Tokens', 'col.blocked': 'Blocked',
+          'act.revoke': 'Revoke', 'act.unrevoke': 'Unrevoke',
+          'badge.new': 'NEW', 'badge.revoked': 'revoked',
+          'confirm.revoke': 'Revoke this client?\nAll requests from this (API key + IP) pair will be blocked immediately.',
+          'revoke.fail': 'Revoke failed: ', 'unrevoke.fail': 'Unrevoke failed: ',
+          'usage.title': 'Usage (last {d} days)',
+          'usage.sub': 'Requests per day, stacked by client (top 5 + Other).',
+          'usage.other': 'Other',
+        },
+        fr: {
+          'tagline': 'Utilise ton abonnement Claude Pro/Max comme moteur de modèle dans Cursor — sans facture API.',
+          'refresh': 'Rafraîchir',
+          'copy': 'Copier', 'copied': 'Copié',
+          'status.online': 'Proxy en ligne',
+          'status.claudeOk': 'Claude connecté', 'status.claudeKo': 'Claude déconnecté',
+          'status.keyOk': 'Clé API configurée', 'status.keyKo': 'Clé API absente',
+          'status.detailTitle': 'Statut détaillé',
+          'connect.title': 'Connecter Cursor',
+          'connect.subtitle': 'Pointe Cursor vers ce proxy en trois réglages, puis discute avec Claude.',
+          'connect.baseUrl': 'URL de base',
+          'connect.baseUrlHelp': 'Dans Cursor → Settings → Models, active <span class="inline-code">Override OpenAI Base URL</span> et colle ceci. Garde le <span class="inline-code">/v1</span>.',
+          'connect.apiKey': 'Clé API',
+          'connect.apiKeyHelp': 'Dans le champ <span class="inline-code">OpenAI API Key</span>, colle <em>ta</em> clé proxy (celle définie dans Vercel) — pas une clé Anthropic. Elle protège ton proxy des usages non autorisés.',
+          'connect.models': 'Modèles à ajouter',
+          'connect.modelsHelp': 'Clique <span class="inline-code">Add Model</span> et saisis un de ces noms. Les noms connus (<span class="inline-code">gpt-4o</span>…) sont interceptés par Cursor : utilise ces noms personnalisés.',
+          'connect.steps': 'Étapes',
+          'connect.step1': 'Ouvre les réglages Cursor (Cmd/Ctrl+Shift+J) → onglet Models.',
+          'connect.step2': 'Active <span class="inline-code">Override OpenAI Base URL</span> et colle l\'URL de base ci-dessus.',
+          'connect.step3': 'Mets ta clé dans <span class="inline-code">OpenAI API Key</span>.',
+          'connect.step4': 'Ajoute un des modèles ci-dessous, sélectionne-le, et envoie un message de test.',
+          'owner.entry': 'Espace propriétaire',
+          'owner.entryHint': 'Statut détaillé, connexion Claude, passkeys, clients & usage.',
+          'owner.unlockPasskey': 'Déverrouiller avec passkey',
+          'owner.useSecret': 'Utiliser plutôt le secret admin',
+          'owner.secretLabel': 'Secret admin',
+          'owner.unlock': 'Déverrouiller',
+          'owner.unlocked': 'Déverrouillé', 'owner.locked': 'Verrouillé', 'owner.lock': 'Verrouiller',
+          'owner.needSecret': 'Entre d\'abord le secret admin.',
+          'owner.badSecret': 'Secret admin invalide.',
+          'stat.auth': 'Connexion', 'stat.expires': 'Expire dans', 'stat.storage': 'Stockage',
+          'stat.apikey': 'Clé API', 'stat.platform': 'Plateforme', 'stat.env': 'Env',
+          'badge.connected': 'connecté', 'badge.disconnected': 'déconnecté',
+          'badge.configured': 'configurée', 'badge.notset': 'absente', 'badge.broken': 'cassé',
+          'signin.title': 'Connexion Claude',
+          'signin.connect': 'Se connecter avec Claude',
+          'signin.manual': 'Coller un code OAuth (secours manuel)',
+          'signin.submit': 'Valider le code',
+          'signin.signedIn': 'Connecté — les jetons sont stockés côté serveur et servent à toutes les requêtes clients.',
+          'signin.signout': 'Se déconnecter',
+          'signin.connecting': 'Connexion…', 'signin.waiting': 'En attente d\'authentification…',
+          'signin.needSecret': 'Déverrouille d\'abord l\'espace propriétaire (passkey ou secret admin).',
+          'signin.badSecret': 'Secret admin invalide', 'signin.startFail': 'Échec du démarrage de l\'authentification',
+          'signin.noUrl': 'Aucune URL d\'authentification reçue', 'signin.pasteFirst': 'Colle d\'abord un code OAuth',
+          'signin.failed': 'Échec de l\'authentification', 'signin.submitFail': 'Échec de l\'envoi du code',
+          'signin.statusFail': 'Échec de récupération du statut', 'signin.signoutFail': 'Échec de la déconnexion',
+          'passkey.title': 'Passkeys (Touch ID / clé FIDO2)',
+          'passkey.add': 'Ajouter un passkey',
+          'passkey.none': 'Aucun passkey enrôlé.',
+          'passkey.session': 'session passkey', 'passkey.lock': 'verrouiller',
+          'passkey.unsupported': 'Ce navigateur ne supporte pas les passkeys.',
+          'passkey.cancelled': 'Annulé, ou aucun passkey ne correspond.',
+          'passkey.cancelledShort': 'Annulé.',
+          'passkey.unlockFail': 'Échec du déverrouillage', 'passkey.notVerified': 'Passkey non vérifié',
+          'passkey.optionsFail': 'Échec des options',
+          'passkey.enrollNeedAdmin': 'Entre d\'abord le secret admin (ou déverrouille avec un passkey existant).',
+          'passkey.enrollFail': 'Échec de l\'enrôlement', 'passkey.deleteFail': 'Échec de la suppression',
+          'passkey.namePrompt': 'Nom de ce passkey (ex. « MacBook Touch ID ») :',
+          'passkey.deleteConfirm': 'Supprimer ce passkey ?',
+          'monitor.title': 'Clients & usage',
+          'monitor.load': 'Charger clients & usage',
+          'monitor.advanced': 'Avancé',
+          'monitor.rawStatus': 'Récupérer le statut complet (JSON)',
+          'clients.title': 'Clients',
+          'clients.sub': 'Une ligne par hash(clé API + IP). Le badge NEW signale un client vu pour la première fois dans les dernières 24 h — vérifie IP / UA / pays pour confirmer que c\'est bien toi.',
+          'clients.empty': 'Aucune requête suivie pour l\'instant.',
+          'clients.emptyPopulate': 'Aucune requête suivie. Envoie une requête à /v1/chat/completions pour peupler.',
+          'clients.loadFail': 'Échec du chargement des clients', 'clients.needSecret': 'Déverrouille d\'abord l\'espace propriétaire.',
+          'col.fp': 'FP', 'col.ip': 'IP', 'col.country': 'Pays', 'col.host': 'Host / ASN',
+          'col.ua': 'UA', 'col.key': 'Clé', 'col.first': '1re vue', 'col.last': 'Vue',
+          'col.req': 'Req', 'col.tokens': 'Tokens', 'col.blocked': 'Bloqué',
+          'act.revoke': 'Révoquer', 'act.unrevoke': 'Réactiver',
+          'badge.new': 'NEW', 'badge.revoked': 'révoqué',
+          'confirm.revoke': 'Révoquer ce client ?\nToutes les requêtes de ce couple (clé API + IP) seront bloquées immédiatement.',
+          'revoke.fail': 'Échec de la révocation : ', 'unrevoke.fail': 'Échec de la réactivation : ',
+          'usage.title': 'Usage ({d} derniers jours)',
+          'usage.sub': 'Requêtes par jour, empilées par client (top 5 + Autres).',
+          'usage.other': 'Autres',
+        },
+      }
 
-      let authWindow = null
-      let authCheckInterval = null
-      let currentSessionId = null
+      const state = { lang: 'en', owner: false }
+      let lastClients = null, lastDaily = null
 
-      document.getElementById('baseUrl').textContent = window.location.origin
+      function t(k) { return (I18N[state.lang] && I18N[state.lang][k]) || I18N.en[k] || k }
 
+      function applyI18n() {
+        document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.getAttribute('data-i18n')) })
+        document.querySelectorAll('[data-i18n-html]').forEach((el) => { el.innerHTML = t(el.getAttribute('data-i18n-html')) })
+        document.querySelectorAll('[data-i18n-ph]').forEach((el) => { el.setAttribute('placeholder', t(el.getAttribute('data-i18n-ph'))) })
+        document.querySelectorAll('[data-i18n-title]').forEach((el) => {
+          const v = t(el.getAttribute('data-i18n-title')); el.setAttribute('title', v); el.setAttribute('aria-label', v)
+        })
+        document.documentElement.lang = state.lang
+        lucide.createIcons()
+      }
+
+      function initLang() {
+        let l
+        try { l = localStorage.getItem('cxk_lang') } catch {}
+        if (l !== 'fr' && l !== 'en') l = (navigator.language || 'en').toLowerCase().startsWith('fr') ? 'fr' : 'en'
+        state.lang = l
+        document.getElementById('langToggle').textContent = l === 'fr' ? 'EN' : 'FR'
+      }
+
+      function toggleLang() {
+        state.lang = state.lang === 'fr' ? 'en' : 'fr'
+        try { localStorage.setItem('cxk_lang', state.lang) } catch {}
+        document.getElementById('langToggle').textContent = state.lang === 'fr' ? 'EN' : 'FR'
+        applyI18n()
+        renderModels()
+        renderPasskeyBadge()
+        refreshStatus()
+        if (state.owner) loadPasskeys()
+        if (lastClients) renderClients(lastClients)
+        if (lastDaily) {
+          const m = new Map((lastClients?.clients || []).map((c) => [c.fingerprint, c]))
+          renderUsageChart(lastDaily.daily || [], m)
+        }
+      }
+
+      async function copyText(text, btn) {
+        try {
+          await navigator.clipboard.writeText(text)
+          const s = btn.querySelector('.copy-label')
+          if (s) { s.textContent = t('copied'); setTimeout(() => { s.textContent = t('copy') }, 1200) }
+          else { const o = btn.getAttribute('title'); btn.setAttribute('title', t('copied')); setTimeout(() => btn.setAttribute('title', o), 1200) }
+        } catch {}
+      }
+
+      // ── Connect card: model list ─────────────────────────────────────────
+      const MODELS = [
+        { name: 'claude-proxy-sonnet-4.6', tag: 'reco' },
+        { name: 'claude-proxy-opus-4.6', tag: 'opus' },
+        { name: 'claude-proxy-haiku-4.5', tag: 'haiku' },
+        { name: 'claude-proxy', tag: 'default' },
+      ]
+      const MODEL_TAGS = {
+        en: { reco: 'recommended', opus: 'most powerful', haiku: 'fastest', default: 'default' },
+        fr: { reco: 'recommandé', opus: 'le plus puissant', haiku: 'le plus rapide', default: 'défaut' },
+      }
+      function renderModels() {
+        const wrap = document.getElementById('models')
+        const tags = MODEL_TAGS[state.lang] || MODEL_TAGS.en
+        wrap.innerHTML = MODELS.map((m) => `
+          <div class="model-row">
+            <span class="name">${m.name}</span>
+            <span class="tag ${m.tag === 'reco' ? 'reco' : ''}">${tags[m.tag]}</span>
+            <button class="copy-btn" onclick="copyText('${m.name}', this)" title="${t('copy')}" aria-label="${t('copy')}">
+              <i data-lucide="copy"></i><span class="copy-label">${t('copy')}</span>
+            </button>
+          </div>`).join('')
+        lucide.createIcons()
+      }
+
+      // ── Helpers ──────────────────────────────────────────────────────────
+      function escapeHtml(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+      }
       function formatDuration(seconds) {
         if (seconds == null) return '—'
         if (seconds <= 0) return 'expired'
@@ -604,185 +829,88 @@
         return `${seconds}s`
       }
 
-      function renderStatus(data) {
-        const authEl = document.getElementById('statAuth')
-        if (data.authenticated) {
-          authEl.innerHTML = '<span class="badge ok"><i data-lucide="check"></i>connected</span>'
-        } else {
-          authEl.innerHTML = '<span class="badge ko"><i data-lucide="x"></i>disconnected</span>'
-        }
-
-        document.getElementById('statExpires').textContent = formatDuration(data.expiresInSeconds)
-
-        const storageEl = document.getElementById('statStorage')
-        const mode = data.storageMode || '—'
-        const isVercelFile = data.deployment?.platform === 'vercel' && mode === 'file'
-        storageEl.innerHTML = isVercelFile
-          ? `<span class="badge ko"><i data-lucide="alert-triangle"></i>${mode} (broken)</span>`
-          : mode === 'redis'
-          ? `<span class="badge ok"><i data-lucide="database"></i>redis</span>`
-          : `<span class="badge">${mode}</span>`
-
-        const apiKeyEl = document.getElementById('statApiKey')
-        apiKeyEl.innerHTML = data.apiKeyConfigured
-          ? '<span class="badge ok"><i data-lucide="check"></i>configured</span>'
-          : '<span class="badge ko"><i data-lucide="alert-triangle"></i>not set</span>'
-
-        const platformEl = document.getElementById('statPlatform')
-        const platform = data.deployment?.platform || 'local'
-        platformEl.innerHTML = platform === 'vercel'
-          ? '<span class="badge ok"><i data-lucide="cloud"></i>vercel</span>'
-          : '<span class="badge"><i data-lucide="laptop"></i>local</span>'
-
-        document.getElementById('statEnv').textContent =
-          data.deployment?.vercelEnv || data.deployment?.region || '—'
-
-        renderWarnings(data.deployment?.warnings || [])
-
-        const auth = document.getElementById('authenticatedView')
-        const unauth = document.getElementById('unauthenticatedView')
-        auth.classList.toggle('hidden', !data.authenticated)
-        unauth.classList.toggle('hidden', data.authenticated)
-
-        lucide.createIcons()
-      }
-
-      function renderWarnings(list) {
-        const box = document.getElementById('warnings')
-        if (!list.length) {
-          box.classList.add('hidden')
-          box.innerHTML = ''
-          return
-        }
-        box.classList.remove('hidden')
-        box.innerHTML = list
-          .map((w) => {
-            const icon = w.severity === 'error' ? 'alert-octagon' : 'alert-triangle'
-            return `<div class="warning-item ${w.severity}">
-              <i data-lucide="${icon}"></i>
-              <div>
-                <div class="msg">${escapeHtml(w.message)}</div>
-                <div class="fix">${escapeHtml(w.remediation)}</div>
-              </div>
-            </div>`
-          })
-          .join('')
-      }
-
-      function escapeHtml(s) {
-        return String(s)
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;')
-      }
-
       // ── Passkeys (0009 Phase 3) ──────────────────────────────────────────
-      // A verified passkey mints a short-lived admin SESSION token that the
-      // server accepts alongside ADMIN_SECRET. We keep it in sessionStorage
-      // (gone when the tab closes) and every admin call prefers it over the
-      // typed secret — so once you unlock, you never paste the secret again.
       const PK_SESSION_KEY = 'cxk_pk_session'
-
       function passkeySession() {
         try {
           const raw = sessionStorage.getItem(PK_SESSION_KEY)
           if (!raw) return null
           const s = JSON.parse(raw)
           if (!s.token || !s.expiresAt || new Date(s.expiresAt).getTime() <= Date.now()) {
-            sessionStorage.removeItem(PK_SESSION_KEY)
-            return null
+            sessionStorage.removeItem(PK_SESSION_KEY); return null
           }
           return s
         } catch { return null }
       }
-
-      // The admin bearer for every privileged call: the passkey session if one
-      // is active, otherwise whatever is typed in the admin-secret field.
       function adminToken() {
         const s = passkeySession()
         if (s) return s.token
         const el = document.getElementById('apiKeyInput')
         return el ? el.value.trim() : ''
       }
-
       function showPasskeyError(msg) {
-        const box = document.getElementById('passkeyError')
         document.getElementById('passkeyErrorText').textContent = msg
-        box.classList.remove('hidden')
+        document.getElementById('passkeyError').classList.remove('hidden')
       }
-      function hidePasskeyError() {
-        document.getElementById('passkeyError').classList.add('hidden')
-      }
-
+      function hidePasskeyError() { document.getElementById('passkeyError').classList.add('hidden') }
       function renderPasskeyBadge() {
         const badge = document.getElementById('passkeySessionBadge')
         if (!badge) return
         badge.innerHTML = passkeySession()
-          ? '<span class="badge ok"><i data-lucide="unlock"></i>session passkey</span> <button class="button-secondary" style="padding:0 0.375rem;font-size:0.6875rem;" onclick="passkeyLogout()">verrouiller</button>'
+          ? `<span class="badge ok" style="text-transform:none;letter-spacing:normal;"><i data-lucide="unlock"></i>${t('passkey.session')}</span>`
           : ''
         lucide.createIcons()
       }
-      function passkeyLogout() {
-        sessionStorage.removeItem(PK_SESSION_KEY)
-        renderPasskeyBadge()
-        refreshStatus()
-      }
-
       function webauthnSupported() {
         return !!window.SimpleWebAuthnBrowser && SimpleWebAuthnBrowser.browserSupportsWebAuthn()
       }
 
-      // Public ceremony: authenticate with a passkey → obtain an admin session.
       async function unlockWithPasskey() {
-        hidePasskeyError()
-        if (!webauthnSupported()) { showPasskeyError('Ce navigateur ne supporte pas les passkeys.'); return }
+        hideUnlockError(); hidePasskeyError()
+        if (!webauthnSupported()) { showUnlockError(t('passkey.unsupported')); return }
         try {
           const optRes = await fetch('/auth/webauthn/auth/options', { method: 'POST' })
           const optionsJSON = await optRes.json()
-          if (!optRes.ok) throw new Error(optionsJSON.message || 'Échec des options')
+          if (!optRes.ok) throw new Error(optionsJSON.message || t('passkey.optionsFail'))
           const assertion = await SimpleWebAuthnBrowser.startAuthentication({ optionsJSON })
           const verRes = await fetch('/auth/webauthn/auth/verify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ response: assertion }),
           })
           const data = await verRes.json()
-          if (!verRes.ok || !data.token) throw new Error(data.error || 'Passkey non vérifié')
+          if (!verRes.ok || !data.token) throw new Error(data.error || t('passkey.notVerified'))
           sessionStorage.setItem(PK_SESSION_KEY, JSON.stringify({ token: data.token, expiresAt: data.expiresAt }))
           renderPasskeyBadge()
           await refreshStatus()
           loadPasskeys()
         } catch (err) {
-          showPasskeyError(err.name === 'NotAllowedError' ? 'Annulé, ou aucun passkey ne correspond.' : (err.message || 'Échec du déverrouillage'))
+          showUnlockError(err.name === 'NotAllowedError' ? t('passkey.cancelled') : (err.message || t('passkey.unlockFail')))
         }
       }
 
-      // Enrollment (needs admin: type the secret first, or unlock with an
-      // existing passkey). Registers this device's Touch ID / security key.
       async function enrollPasskey() {
         hidePasskeyError()
-        if (!webauthnSupported()) { showPasskeyError('Ce navigateur ne supporte pas les passkeys.'); return }
+        if (!webauthnSupported()) { showPasskeyError(t('passkey.unsupported')); return }
         const tok = adminToken()
-        if (!tok) { showPasskeyError("Entre d'abord le secret admin (ou déverrouille avec un passkey existant)."); return }
+        if (!tok) { showPasskeyError(t('passkey.enrollNeedAdmin')); return }
         try {
           const optRes = await fetch('/auth/webauthn/register/options', {
             method: 'POST', headers: { Authorization: 'Bearer ' + tok },
           })
           const optionsJSON = await optRes.json()
-          if (!optRes.ok) throw new Error(optRes.status === 401 ? 'Secret admin invalide' : (optionsJSON.message || 'Échec des options'))
+          if (!optRes.ok) throw new Error(optRes.status === 401 ? t('owner.badSecret') : (optionsJSON.message || t('passkey.optionsFail')))
           const attestation = await SimpleWebAuthnBrowser.startRegistration({ optionsJSON })
-          const label = (prompt('Nom de ce passkey (ex. « MacBook Touch ID ») :', 'passkey') || 'passkey').slice(0, 60)
+          const label = (prompt(t('passkey.namePrompt'), 'passkey') || 'passkey').slice(0, 60)
           const verRes = await fetch('/auth/webauthn/register/verify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
             body: JSON.stringify({ response: attestation, label }),
           })
           const data = await verRes.json()
-          if (!verRes.ok || !data.verified) throw new Error(data.error || "Échec de l'enrôlement")
+          if (!verRes.ok || !data.verified) throw new Error(data.error || t('passkey.enrollFail'))
           loadPasskeys()
         } catch (err) {
-          showPasskeyError(err.name === 'NotAllowedError' ? 'Annulé.' : (err.message || "Échec de l'enrôlement"))
+          showPasskeyError(err.name === 'NotAllowedError' ? t('passkey.cancelledShort') : (err.message || t('passkey.enrollFail')))
         }
       }
 
@@ -802,7 +930,7 @@
                    <button class="button-secondary" style="padding:0.125rem 0.5rem;" onclick="deletePasskey('${escapeHtml(c.id)}')"><i data-lucide="trash-2" style="width:12px;height:12px;"></i></button>
                  </div>`,
               ).join('')
-            : '<span style="color:hsl(var(--muted-foreground));">Aucun passkey enrôlé.</span>'
+            : `<span style="color:hsl(var(--muted-foreground));">${t('passkey.none')}</span>`
           lucide.createIcons()
         } catch { list.innerHTML = '' }
       }
@@ -810,79 +938,161 @@
       async function deletePasskey(id) {
         const tok = adminToken()
         if (!tok) return
-        if (!confirm('Supprimer ce passkey ?')) return
+        if (!confirm(t('passkey.deleteConfirm'))) return
         try {
           await fetch('/auth/webauthn/credentials/' + encodeURIComponent(id), {
             method: 'DELETE', headers: { Authorization: 'Bearer ' + tok },
           })
           loadPasskeys()
-        } catch { showPasskeyError('Échec de la suppression') }
+        } catch { showPasskeyError(t('passkey.deleteFail')) }
+      }
+
+      // ── Owner unlock / lock ──────────────────────────────────────────────
+      function showUnlockError(msg) {
+        document.getElementById('unlockErrorText').textContent = msg
+        document.getElementById('unlockError').classList.remove('hidden')
+      }
+      function hideUnlockError() { document.getElementById('unlockError').classList.add('hidden') }
+
+      async function tryUnlockWithSecret() {
+        hideUnlockError()
+        const secret = document.getElementById('apiKeyInput').value.trim()
+        if (!secret) { showUnlockError(t('owner.needSecret')); return }
+        await refreshStatus()
+        if (state.owner) { hideUnlockError(); loadPasskeys() }
+        else showUnlockError(t('owner.badSecret'))
+      }
+
+      function lockOwner() {
+        sessionStorage.removeItem(PK_SESSION_KEY)
+        const el = document.getElementById('apiKeyInput'); if (el) el.value = ''
+        state.owner = false
+        renderPasskeyBadge()
+        refreshStatus()
+      }
+
+      function applyOwnerView() {
+        document.getElementById('ownerView').classList.toggle('hidden', !state.owner)
+        document.getElementById('ownerLockedState').classList.toggle('hidden', state.owner)
+        document.getElementById('ownerUnlockedState').classList.toggle('hidden', !state.owner)
+      }
+
+      // ── Status ───────────────────────────────────────────────────────────
+      function renderStatusline(data) {
+        const claude = document.getElementById('pillClaude')
+        claude.className = 'pill ' + (data.authenticated ? 'ok' : 'ko')
+        claude.innerHTML = `<i data-lucide="${data.authenticated ? 'check' : 'x'}"></i>${t(data.authenticated ? 'status.claudeOk' : 'status.claudeKo')}`
+        const key = document.getElementById('pillKey')
+        key.className = 'pill ' + (data.apiKeyConfigured ? 'ok' : 'ko')
+        key.innerHTML = `<i data-lucide="${data.apiKeyConfigured ? 'check' : 'alert-triangle'}"></i>${t(data.apiKeyConfigured ? 'status.keyOk' : 'status.keyKo')}`
+        lucide.createIcons()
+      }
+
+      function renderOwnerStatus(data) {
+        const authEl = document.getElementById('statAuth')
+        authEl.innerHTML = data.authenticated
+          ? `<span class="badge ok"><i data-lucide="check"></i>${t('badge.connected')}</span>`
+          : `<span class="badge ko"><i data-lucide="x"></i>${t('badge.disconnected')}</span>`
+
+        document.getElementById('statExpires').textContent = formatDuration(data.expiresInSeconds)
+
+        const storageEl = document.getElementById('statStorage')
+        const mode = data.storageMode || '—'
+        const isVercelFile = data.deployment?.platform === 'vercel' && mode === 'file'
+        storageEl.innerHTML = isVercelFile
+          ? `<span class="badge ko"><i data-lucide="alert-triangle"></i>${mode} (${t('badge.broken')})</span>`
+          : mode === 'redis'
+          ? `<span class="badge ok"><i data-lucide="database"></i>redis</span>`
+          : `<span class="badge">${escapeHtml(mode)}</span>`
+
+        document.getElementById('statApiKey').innerHTML = data.apiKeyConfigured
+          ? `<span class="badge ok"><i data-lucide="check"></i>${t('badge.configured')}</span>`
+          : `<span class="badge ko"><i data-lucide="alert-triangle"></i>${t('badge.notset')}</span>`
+
+        const platform = data.deployment?.platform || 'local'
+        document.getElementById('statPlatform').innerHTML = platform === 'vercel'
+          ? '<span class="badge ok"><i data-lucide="cloud"></i>vercel</span>'
+          : '<span class="badge"><i data-lucide="laptop"></i>local</span>'
+
+        document.getElementById('statEnv').textContent = data.deployment?.vercelEnv || data.deployment?.region || '—'
+        renderWarnings(data.deployment?.warnings || [])
+      }
+
+      function renderWarnings(list) {
+        const box = document.getElementById('warnings')
+        if (!list.length) { box.classList.add('hidden'); box.innerHTML = ''; return }
+        box.classList.remove('hidden')
+        box.innerHTML = list.map((w) => {
+          const icon = w.severity === 'error' ? 'alert-octagon' : 'alert-triangle'
+          return `<div class="warning-item ${w.severity}"><i data-lucide="${icon}"></i><div><div class="msg">${escapeHtml(w.message)}</div><div class="fix">${escapeHtml(w.remediation)}</div></div></div>`
+        }).join('')
       }
 
       async function refreshStatus() {
         try {
-          // /auth/status returns a bare {authenticated, apiKeyConfigured} to the
-          // public; the full detail (expiry, storage, region, warnings) is
-          // owner-only. Send the admin secret when the field is filled so the
-          // owner's dashboard shows the complete status.
           const key = adminToken()
-          const res = await fetch('/auth/status', {
-            headers: key ? { Authorization: 'Bearer ' + key } : {},
-          })
-          renderStatus(await res.json())
+          const res = await fetch('/auth/status', { headers: key ? { Authorization: 'Bearer ' + key } : {} })
+          const data = await res.json()
+          const isFull = data && (('storageMode' in data) || ('deployment' in data) || ('expiresInSeconds' in data))
+          state.owner = !!isFull
+          renderStatusline(data)
+          if (isFull) renderOwnerStatus(data)
+          applyOwnerView()
+          const auth = document.getElementById('authenticatedView')
+          const unauth = document.getElementById('unauthenticatedView')
+          if (auth && unauth) {
+            auth.classList.toggle('hidden', !data.authenticated)
+            unauth.classList.toggle('hidden', !!data.authenticated)
+          }
+          lucide.createIcons()
         } catch (err) {
-          showAuthError('Failed to fetch status')
+          showAuthError(t('signin.statusFail'))
         }
       }
 
+      // ── Claude OAuth sign-in ─────────────────────────────────────────────
+      let authWindow = null
+      let authCheckInterval = null
+      let currentSessionId = null
+
       async function startAuth() {
-        // /auth/oauth/start is admin-only: send the admin secret (API key field).
         const key = adminToken()
-        if (!key) { showAuthError('Enter the admin secret (API key field) to authenticate'); return }
+        if (!key) { showAuthError(t('signin.needSecret')); return }
         const btn = document.getElementById('startAuthBtn')
         const btnText = document.getElementById('btnText')
         btn.disabled = true
-        btnText.innerHTML = '<span class="loading-spinner"></span>Connecting…'
+        btnText.innerHTML = '<span class="loading-spinner"></span>' + t('signin.connecting')
         hideAuthError()
-
         try {
-          const res = await fetch('/auth/oauth/start', {
-            method: 'POST',
-            headers: { Authorization: 'Bearer ' + key },
-          })
-          if (!res.ok) throw new Error(res.status === 401 ? 'Invalid admin secret' : 'Failed to start authentication')
+          const res = await fetch('/auth/oauth/start', { method: 'POST', headers: { Authorization: 'Bearer ' + key } })
+          if (!res.ok) throw new Error(res.status === 401 ? t('signin.badSecret') : t('signin.startFail'))
           const data = await res.json()
-          if (!data.authUrl) throw new Error('No auth URL received')
-
+          if (!data.authUrl) throw new Error(t('signin.noUrl'))
           currentSessionId = data.sessionId
           authWindow = window.open(data.authUrl, 'claude-auth', 'width=600,height=700')
-
           authCheckInterval = setInterval(async () => {
             if (authWindow && authWindow.closed) {
               clearInterval(authCheckInterval)
               btn.disabled = false
-              btnText.textContent = 'Connect with Claude'
+              btnText.textContent = t('signin.connect')
               await refreshStatus()
             }
           }, 1000)
-
-          btnText.innerHTML = '<i data-lucide="external-link" style="width:16px;height:16px;"></i> Waiting for authentication…'
+          btnText.innerHTML = '<i data-lucide="external-link" style="width:16px;height:16px;"></i> ' + t('signin.waiting')
           lucide.createIcons()
         } catch (err) {
-          showAuthError(err.message || 'Failed to start authentication')
+          showAuthError(err.message || t('signin.startFail'))
           btn.disabled = false
-          btnText.textContent = 'Connect with Claude'
+          btnText.textContent = t('signin.connect')
         }
       }
 
       async function submitCode() {
-        // /auth/oauth/callback is admin-only: send the admin secret (API key field).
         const key = adminToken()
         const input = document.getElementById('authCode')
         const code = input.value.trim()
-        if (!code) { showAuthError('Paste an OAuth code first'); return }
-        if (!key) { showAuthError('Enter the admin secret (API key field) to authenticate'); return }
-
+        if (!code) { showAuthError(t('signin.pasteFirst')); return }
+        if (!key) { showAuthError(t('signin.needSecret')); return }
         try {
           const body = { code, ...(currentSessionId && { sessionId: currentSessionId }) }
           const res = await fetch('/auth/oauth/callback', {
@@ -891,74 +1101,46 @@
             body: JSON.stringify(body),
           })
           const data = await res.json()
-          if (data.success) {
-            input.value = ''
-            hideAuthError()
-            await refreshStatus()
-          } else {
-            showAuthError(data.message || 'Authentication failed')
-          }
+          if (data.success) { input.value = ''; hideAuthError(); await refreshStatus() }
+          else showAuthError(data.message || t('signin.failed'))
         } catch (err) {
-          showAuthError('Failed to submit code')
+          showAuthError(t('signin.submitFail'))
         }
       }
 
       async function logout() {
-        // /auth/logout is now protected (it deletes the OAuth token): send the API key.
         const key = adminToken()
-        if (!key) {
-          showAuthError('Enter your API key (field below) to sign out.')
-          return
-        }
+        if (!key) { showAuthError(t('signin.needSecret')); return }
         try {
-          const res = await fetch('/auth/logout', {
-            method: 'POST',
-            headers: { Authorization: 'Bearer ' + key },
-          })
-          if (!res.ok) {
-            showAuthError(res.status === 401 ? 'Invalid API key.' : 'Failed to sign out')
-            return
-          }
+          const res = await fetch('/auth/logout', { method: 'POST', headers: { Authorization: 'Bearer ' + key } })
+          if (!res.ok) { showAuthError(res.status === 401 ? t('signin.badSecret') : t('signin.signoutFail')); return }
           await refreshStatus()
-        } catch (err) {
-          showAuthError('Failed to sign out')
-        }
+        } catch (err) { showAuthError(t('signin.signoutFail')) }
+      }
+
+      function showAuthError(msg) {
+        const el = document.getElementById('authErrorText'); if (!el) return
+        el.textContent = msg
+        document.getElementById('authError').classList.remove('hidden')
+      }
+      function hideAuthError() { document.getElementById('authError').classList.add('hidden') }
+      function showJsonError(msg) {
+        document.getElementById('jsonErrorText').textContent = msg
+        document.getElementById('jsonError').classList.remove('hidden')
       }
 
       async function loadFullStatus() {
         const key = adminToken()
         const out = document.getElementById('jsonOutput')
-        const err = document.getElementById('jsonError')
-        err.classList.add('hidden')
-
-        if (!key) { showJsonError('Enter the API key'); return }
-
+        document.getElementById('jsonError').classList.add('hidden')
+        if (!key) { showJsonError(t('clients.needSecret')); return }
         try {
-          const res = await fetch('/api/status/full', {
-            headers: { Authorization: `Bearer ${key}` },
-          })
+          const res = await fetch('/api/status/full', { headers: { Authorization: `Bearer ${key}` } })
           const data = await res.json()
-          if (!res.ok) {
-            showJsonError(data.message || `HTTP ${res.status}`)
-            return
-          }
+          if (!res.ok) { showJsonError(data.message || `HTTP ${res.status}`); return }
           out.textContent = JSON.stringify(data, null, 2)
           out.classList.remove('hidden')
-        } catch (error) {
-          showJsonError('Request failed')
-        }
-      }
-
-      function showAuthError(msg) {
-        document.getElementById('authErrorText').textContent = msg
-        document.getElementById('authError').classList.remove('hidden')
-      }
-      function hideAuthError() {
-        document.getElementById('authError').classList.add('hidden')
-      }
-      function showJsonError(msg) {
-        document.getElementById('jsonErrorText').textContent = msg
-        document.getElementById('jsonError').classList.remove('hidden')
+        } catch (error) { showJsonError(t('clients.loadFail')) }
       }
 
       window.addEventListener('message', async (event) => {
@@ -969,70 +1151,64 @@
         }
       })
 
-      // ── Clients & usage ───────────────────────────────────────────
+      // ── Clients & usage ──────────────────────────────────────────────────
       let usageChart = null
-
       function countryFlag(code) {
         if (!code || code.length !== 2) return ''
         const base = 127397
-        return (
-          String.fromCodePoint(base + code.toUpperCase().charCodeAt(0)) +
-          String.fromCodePoint(base + code.toUpperCase().charCodeAt(1))
-        )
+        return String.fromCodePoint(base + code.toUpperCase().charCodeAt(0)) + String.fromCodePoint(base + code.toUpperCase().charCodeAt(1))
       }
-
       function formatRelative(iso) {
         if (!iso) return '—'
-        const now = Date.now()
         const then = new Date(iso).getTime()
         if (Number.isNaN(then)) return iso
-        const s = Math.max(0, Math.floor((now - then) / 1000))
-        if (s < 60) return s + 's ago'
-        const m = Math.floor(s / 60)
-        if (m < 60) return m + 'm ago'
-        const h = Math.floor(m / 60)
-        if (h < 24) return h + 'h ago'
-        const d = Math.floor(h / 24)
-        return d + 'd ago'
+        const s = Math.max(0, Math.floor((Date.now() - then) / 1000))
+        if (s < 60) return s + 's'
+        const m = Math.floor(s / 60); if (m < 60) return m + 'm'
+        const h = Math.floor(m / 60); if (h < 24) return h + 'h'
+        return Math.floor(h / 24) + 'd'
       }
-
       function isNew(firstSeenIso) {
         if (!firstSeenIso) return false
-        const first = new Date(firstSeenIso).getTime()
-        return Date.now() - first < 24 * 3600 * 1000
+        return Date.now() - new Date(firstSeenIso).getTime() < 24 * 3600 * 1000
       }
-
-      function truncate(s, n) {
-        if (!s) return ''
-        return s.length > n ? s.slice(0, n - 1) + '…' : s
+      function hostTag(netType) {
+        if (!netType || netType === 'unknown') return ''
+        const colors = { hosting: 'hsl(var(--destructive))', mobile: 'hsl(var(--primary))', business: 'hsl(var(--primary))', residential: 'hsl(var(--success))' }
+        const c = colors[netType] || 'hsl(var(--muted-foreground))'
+        return ` <span style="font-size: 0.6875rem; color: ${c}; margin-left: 0.25rem;">·&nbsp;${escapeHtml(netType)}</span>`
+      }
+      function formatHost(c) {
+        if (c.hostLabel) {
+          const tooltip = [c.asnOrg, c.ptr, c.asn ? 'AS' + c.asn : null].filter(Boolean).join(' · ')
+          return `<span title="${escapeHtml(tooltip)}">${escapeHtml(c.hostLabel)}</span>${hostTag(c.netType)}`
+        }
+        if (c.asn || c.asnOrg) return `<span>${escapeHtml(c.asnOrg || ('AS' + c.asn))}</span>`
+        return '<span style="color: hsl(var(--muted-foreground));">—</span>'
       }
 
       function renderClients(data) {
+        lastClients = data
         const wrap = document.getElementById('clientsTableWrap')
         const backendEl = document.getElementById('clientsBackend')
-        backendEl.textContent = data.backend
-          ? '· backend: ' + data.backend + ' · ' + data.retentionDays + 'd retention'
-          : ''
-
+        backendEl.textContent = data.backend ? '· backend: ' + data.backend + ' · ' + data.retentionDays + 'd' : ''
         const clients = data.clients || []
         if (!clients.length) {
-          wrap.innerHTML = '<div class="clients-empty">No requests tracked yet. Send a request to <span class="mono">/v1/chat/completions</span> to populate.</div>'
+          wrap.innerHTML = `<div class="clients-empty">${t('clients.emptyPopulate')}</div>`
           return
         }
-
         const rows = clients.map((c) => {
-          const newBadge = isNew(c.firstSeen) ? '<span class="badge new">NEW</span>' : ''
-          const revokedBadge = c.revoked ? '<span class="badge revoked">revoked</span>' : ''
+          const newBadge = isNew(c.firstSeen) ? `<span class="badge new">${t('badge.new')}</span>` : ''
+          const revokedBadge = c.revoked ? `<span class="badge revoked">${t('badge.revoked')}</span>` : ''
           const flag = countryFlag(c.country)
           const btn = c.revoked
-            ? `<button class="button-ghost" onclick="unrevokeClient('${c.fingerprint}')"><i data-lucide="rotate-ccw" style="width:12px;height:12px;"></i> Unrevoke</button>`
-            : `<button class="button-danger" onclick="revokeClient('${c.fingerprint}')"><i data-lucide="ban" style="width:12px;height:12px;"></i> Revoke</button>`
-          const host = formatHost(c)
+            ? `<button class="button-ghost" onclick="unrevokeClient('${c.fingerprint}')"><i data-lucide="rotate-ccw" style="width:12px;height:12px;"></i> ${t('act.unrevoke')}</button>`
+            : `<button class="button-danger" onclick="revokeClient('${c.fingerprint}')"><i data-lucide="ban" style="width:12px;height:12px;"></i> ${t('act.revoke')}</button>`
           return `<tr>
             <td class="mono">${escapeHtml(c.fingerprint.slice(0, 8))}</td>
             <td class="mono">${escapeHtml(c.ip || '—')}</td>
             <td>${flag} ${escapeHtml(c.country || '—')}</td>
-            <td>${host}</td>
+            <td>${formatHost(c)}</td>
             <td><span class="client-ua">${escapeHtml(c.uaParsed || 'unknown')}</span></td>
             <td class="mono opt">${escapeHtml(c.apiKeySuffix || '—')}</td>
             <td class="opt">${escapeHtml(formatRelative(c.firstSeen))}</td>
@@ -1043,134 +1219,39 @@
             <td>${newBadge} ${revokedBadge} ${btn}</td>
           </tr>`
         }).join('')
-
-        wrap.innerHTML = `
-          <div style="overflow-x: auto;">
-            <table class="clients-table">
-              <thead><tr>
-                <th>FP</th>
-                <th>IP</th>
-                <th>Country</th>
-                <th>Host / ASN</th>
-                <th>UA</th>
-                <th class="opt">Key</th>
-                <th class="opt">First</th>
-                <th>Last</th>
-                <th class="num">Req</th>
-                <th class="num opt">Tokens</th>
-                <th class="num opt">Blocked</th>
-                <th></th>
-              </tr></thead>
-              <tbody>${rows}</tbody>
-            </table>
-          </div>`
+        wrap.innerHTML = `<div style="overflow-x: auto;"><table class="clients-table">
+          <thead><tr>
+            <th>${t('col.fp')}</th><th>${t('col.ip')}</th><th>${t('col.country')}</th><th>${t('col.host')}</th>
+            <th>${t('col.ua')}</th><th class="opt">${t('col.key')}</th><th class="opt">${t('col.first')}</th>
+            <th>${t('col.last')}</th><th class="num">${t('col.req')}</th><th class="num opt">${t('col.tokens')}</th>
+            <th class="num opt">${t('col.blocked')}</th><th></th>
+          </tr></thead><tbody>${rows}</tbody></table></div>`
         lucide.createIcons()
-      }
-
-      // Build the "Host / ASN" cell. The server pre-computes `hostLabel`
-      // so we just render it; fall back to ASN/PTR if it's missing (older
-      // records from before this feature was deployed).
-      function formatHost(c) {
-        if (c.hostLabel) {
-          const tooltip = [c.asnOrg, c.ptr, c.asn ? 'AS' + c.asn : null]
-            .filter(Boolean)
-            .join(' · ')
-          const tag = hostTag(c.netType)
-          return `<span title="${escapeHtml(tooltip)}">${escapeHtml(c.hostLabel)}</span>${tag}`
-        }
-        if (c.asn || c.asnOrg) {
-          const label = c.asnOrg || ('AS' + c.asn)
-          return `<span>${escapeHtml(label)}</span>`
-        }
-        return '<span style="color: hsl(var(--muted-foreground));">—</span>'
-      }
-
-      function hostTag(netType) {
-        if (!netType || netType === 'unknown') return ''
-        const colors = {
-          hosting: 'hsl(var(--destructive))',
-          mobile: 'hsl(var(--primary))',
-          business: 'hsl(var(--primary))',
-          residential: 'hsl(var(--success))',
-        }
-        const c = colors[netType] || 'hsl(var(--muted-foreground))'
-        return ` <span style="font-size: 0.6875rem; color: ${c}; margin-left: 0.25rem;">·&nbsp;${escapeHtml(netType)}</span>`
       }
 
       function renderUsageChart(daily, clientsMap) {
         const ctx = document.getElementById('usageChart')
         if (!ctx) return
         const labels = daily.map((d) => d.date.slice(5))
-
-        // Aggregate total per fingerprint to pick top 5
         const totals = new Map()
-        for (const day of daily) {
-          for (const [fp, dc] of Object.entries(day.perFingerprint || {})) {
-            totals.set(fp, (totals.get(fp) || 0) + (dc.requests || 0))
-          }
-        }
-        const top = [...totals.entries()]
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 5)
-          .map(([fp]) => fp)
+        for (const day of daily) for (const [fp, dc] of Object.entries(day.perFingerprint || {})) totals.set(fp, (totals.get(fp) || 0) + (dc.requests || 0))
+        const top = [...totals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([fp]) => fp)
         const topSet = new Set(top)
-
-        function labelFor(fp) {
-          const c = clientsMap.get(fp)
-          if (!c) return fp.slice(0, 6)
-          return (c.uaParsed || 'client') + ' · ' + (c.ip || fp.slice(0, 6))
-        }
-
-        const palette = [
-          'hsl(15, 65%, 55%)',
-          'hsl(210, 65%, 55%)',
-          'hsl(150, 55%, 45%)',
-          'hsl(280, 55%, 55%)',
-          'hsl(40, 75%, 55%)',
-          'hsl(0, 0%, 55%)',
-        ]
-
-        const datasets = top.map((fp, i) => ({
-          label: labelFor(fp),
-          data: daily.map((d) => (d.perFingerprint?.[fp]?.requests || 0)),
-          backgroundColor: palette[i],
-          stack: 'req',
-        }))
-        const otherData = daily.map((d) => {
-          let sum = 0
-          for (const [fp, dc] of Object.entries(d.perFingerprint || {})) {
-            if (!topSet.has(fp)) sum += (dc.requests || 0)
-          }
-          return sum
-        })
-        if (otherData.some((v) => v > 0)) {
-          datasets.push({
-            label: 'Other',
-            data: otherData,
-            backgroundColor: palette[5],
-            stack: 'req',
-          })
-        }
-
+        function labelFor(fp) { const c = clientsMap.get(fp); return c ? (c.uaParsed || 'client') + ' · ' + (c.ip || fp.slice(0, 6)) : fp.slice(0, 6) }
+        const palette = ['hsl(15, 65%, 55%)', 'hsl(210, 65%, 55%)', 'hsl(150, 55%, 45%)', 'hsl(280, 55%, 55%)', 'hsl(40, 75%, 55%)', 'hsl(0, 0%, 55%)']
+        const datasets = top.map((fp, i) => ({ label: labelFor(fp), data: daily.map((d) => (d.perFingerprint?.[fp]?.requests || 0)), backgroundColor: palette[i], stack: 'req' }))
+        const otherData = daily.map((d) => { let sum = 0; for (const [fp, dc] of Object.entries(d.perFingerprint || {})) if (!topSet.has(fp)) sum += (dc.requests || 0); return sum })
+        if (otherData.some((v) => v > 0)) datasets.push({ label: t('usage.other'), data: otherData, backgroundColor: palette[5], stack: 'req' })
         const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
         const tick = isDark ? 'hsl(46, 10%, 74%)' : 'hsl(48, 20%, 20%)'
         const grid = isDark ? 'hsl(60, 5%, 23%)' : 'hsl(50, 8%, 84%)'
-
         if (usageChart) usageChart.destroy()
         usageChart = new Chart(ctx, {
-          type: 'bar',
-          data: { labels, datasets },
+          type: 'bar', data: { labels, datasets },
           options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-              x: { stacked: true, ticks: { color: tick }, grid: { color: grid } },
-              y: { stacked: true, beginAtZero: true, ticks: { color: tick, precision: 0 }, grid: { color: grid } },
-            },
-            plugins: {
-              legend: { labels: { color: tick, boxWidth: 12 } },
-              tooltip: { mode: 'index', intersect: false },
-            },
+            responsive: true, maintainAspectRatio: false,
+            scales: { x: { stacked: true, ticks: { color: tick }, grid: { color: grid } }, y: { stacked: true, beginAtZero: true, ticks: { color: tick, precision: 0 }, grid: { color: grid } } },
+            plugins: { legend: { labels: { color: tick, boxWidth: 12 } }, tooltip: { mode: 'index', intersect: false } },
           },
         })
       }
@@ -1180,8 +1261,7 @@
         const errBox = document.getElementById('clientsError')
         const errText = document.getElementById('clientsErrorText')
         errBox.classList.add('hidden')
-        if (!key) { showJsonError('Enter the API key first'); return }
-
+        if (!key) { showJsonError(t('clients.needSecret')); return }
         try {
           const [cRes, dRes] = await Promise.all([
             fetch('/api/clients', { headers: { Authorization: 'Bearer ' + key } }),
@@ -1191,59 +1271,50 @@
           const dData = await dRes.json()
           if (!cRes.ok) { errText.textContent = cData.message || ('HTTP ' + cRes.status); errBox.classList.remove('hidden'); return }
           if (!dRes.ok) { errText.textContent = dData.message || ('HTTP ' + dRes.status); errBox.classList.remove('hidden'); return }
-
           document.getElementById('clientsSection').classList.remove('hidden')
           document.getElementById('usageSection').classList.remove('hidden')
-          document.getElementById('usageDays').textContent = dData.days || cData.retentionDays || 30
-
+          const days = dData.days || cData.retentionDays || 30
+          document.getElementById('usageTitle').textContent = t('usage.title').replace('{d}', days)
+          lastDaily = dData
           renderClients(cData)
           const clientsMap = new Map((cData.clients || []).map((c) => [c.fingerprint, c]))
           renderUsageChart(dData.daily || [], clientsMap)
         } catch (err) {
-          errText.textContent = 'Failed to load clients'
+          errText.textContent = t('clients.loadFail')
           errBox.classList.remove('hidden')
         }
       }
 
       async function revokeClient(fp) {
-        const key = adminToken()
-        if (!key) return
-        if (!confirm('Revoke client ' + fp.slice(0, 8) + '…?\nAll requests from this (api_key + IP) combo will be blocked immediately.')) return
+        const key = adminToken(); if (!key) return
+        if (!confirm(t('confirm.revoke'))) return
         try {
-          const res = await fetch('/api/clients/' + encodeURIComponent(fp) + '/revoke', {
-            method: 'POST',
-            headers: { Authorization: 'Bearer ' + key },
-          })
+          const res = await fetch('/api/clients/' + encodeURIComponent(fp) + '/revoke', { method: 'POST', headers: { Authorization: 'Bearer ' + key } })
           if (!res.ok) throw new Error('HTTP ' + res.status)
           await loadClients()
-        } catch (err) {
-          alert('Revoke failed: ' + err.message)
-        }
+        } catch (err) { alert(t('revoke.fail') + err.message) }
       }
-
       async function unrevokeClient(fp) {
-        const key = adminToken()
-        if (!key) return
+        const key = adminToken(); if (!key) return
         try {
-          const res = await fetch('/api/clients/' + encodeURIComponent(fp) + '/unrevoke', {
-            method: 'POST',
-            headers: { Authorization: 'Bearer ' + key },
-          })
+          const res = await fetch('/api/clients/' + encodeURIComponent(fp) + '/unrevoke', { method: 'POST', headers: { Authorization: 'Bearer ' + key } })
           if (!res.ok) throw new Error('HTTP ' + res.status)
           await loadClients()
-        } catch (err) {
-          alert('Unrevoke failed: ' + err.message)
-        }
+        } catch (err) { alert(t('unrevoke.fail') + err.message) }
       }
 
-      refreshStatus()
-      setInterval(refreshStatus, 30000)
-
-      // Passkeys (0009 Phase 3): show any active session + list enrolled keys;
-      // re-list when the admin secret is typed (that enables enrollment).
+      // ── Boot ─────────────────────────────────────────────────────────────
+      document.getElementById('baseUrl').textContent = window.location.origin + '/v1'
+      initLang()
+      applyI18n()
+      renderModels()
       renderPasskeyBadge()
-      loadPasskeys()
-      document.getElementById('apiKeyInput').addEventListener('input', () => loadPasskeys())
+      refreshStatus()
+      if (passkeySession()) loadPasskeys()
+      setInterval(refreshStatus, 30000)
+      document.getElementById('apiKeyInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); tryUnlockWithSecret() }
+      })
     </script>
   </body>
 </html>
