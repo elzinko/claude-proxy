@@ -706,9 +706,11 @@
           const optRes = await fetch('/auth/webauthn/auth/options', { method: 'POST' })
           const optionsJSON = await optRes.json()
           if (!optRes.ok) throw new Error(optionsJSON.message || t('passkey.optionsFail'))
-          // No credentials registered for this domain → guide to the secret path
-          // instead of dropping the user into the browser's cross-device (phone) flow.
-          if (!optionsJSON.allowCredentials || optionsJSON.allowCredentials.length === 0) { showUnlockError(t('owner.noPasskey')); return }
+          // The server uses DISCOVERABLE credentials and never returns
+          // allowCredentials (it won't enumerate which passkeys exist), so we
+          // can't pre-detect "no passkey enrolled". If none matches on this
+          // device the ceremony ends in NotAllowedError, handled below with a
+          // clear pointer to the admin-secret path (instead of a dead-end QR).
           const assertion = await SimpleWebAuthnBrowser.startAuthentication({ optionsJSON })
           const verRes = await fetch('/auth/webauthn/auth/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ response: assertion }) })
           const data = await verRes.json()
