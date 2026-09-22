@@ -36,7 +36,7 @@
   "author": "elzinko",
   "license": "MIT",
   "dependencies": {
-    "@hono/node-server": "^1.19.9",
+    "@hono/node-server": "^2.1.0",
     "@simplewebauthn/server": "^13.3.2",
     "@upstash/redis": "^1.38.1",
     "hono": "^4.12.33"
